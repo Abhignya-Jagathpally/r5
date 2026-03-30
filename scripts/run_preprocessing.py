@@ -153,6 +153,7 @@ def run_quality_filtering(
 
     stats = {"total": 0, "kept": 0, "filtered": 0}
 
+    removed_files = []
     for tile_file in tqdm(tile_files, desc="Quality filtering"):
         try:
             import cv2
@@ -166,11 +167,17 @@ def run_quality_filtering(
 
             if not normalizer.is_high_quality(image):
                 stats["filtered"] += 1
+                # Remove low-quality tile so downstream stages don't process it
+                removed_files.append(tile_file)
+                tile_file.unlink()
             else:
                 stats["kept"] += 1
 
         except Exception as e:
             logger.warning(f"Error filtering {tile_file}: {e}")
+
+    if removed_files:
+        logger.info(f"Removed {len(removed_files)} low-quality tiles from disk")
 
     logger.info(
         f"Quality filtering complete: {stats['kept']}/{stats['total']} kept"
@@ -424,11 +431,31 @@ def main():
                 embeddings_metadata_path = (
                     Path(config["storage"]["embeddings_dir"]) / "metadata.parquet"
                 )
+                # manifest_df is tile-level; embedding extraction needs slide-level
+                # metadata with 'slide_id', 'label', and tile info. Ensure the
+                # manifest has the required columns, adding defaults if missing.
+                embed_metadata = manifest_df.copy()
+                if "label" not in embed_metadata.columns:
+                    logger.warning(
+                        "Tile manifest missing 'label' column — required by embedding "
+                        "extraction. Add labels via a slide-level metadata CSV. "
+                        "Defaulting to label=0 for all slides."
+                    )
+                    embed_metadata["label"] = 0
+                if "tile_filename" not in embed_metadata.columns:
+                    # Infer tile filename from available columns
+                    if "filename" in embed_metadata.columns:
+                        embed_metadata["tile_filename"] = embed_metadata["filename"]
+                    elif "tile_path" in embed_metadata.columns:
+                        embed_metadata["tile_filename"] = embed_metadata["tile_path"].apply(
+                            lambda p: Path(p).name
+                        )
+
                 run_embedding_extraction(
                     config["storage"]["deduplicated_dir"],
                     config["storage"]["embeddings_dir"],
                     str(embeddings_metadata_path),
-                    manifest_df,
+                    embed_metadata,
                     config,
                 )
 

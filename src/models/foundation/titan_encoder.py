@@ -330,10 +330,11 @@ class TITANEncoder(nn.Module):
         if not directory.is_dir():
             raise ValueError(f"Directory not found: {directory}")
 
-        # Find all slide/patch images
+        # Find all slide/patch images (case-insensitive)
         slide_paths = []
         for ext in extensions:
             slide_paths.extend(directory.glob(f"*{ext}"))
+            slide_paths.extend(directory.glob(f"*{ext.upper()}"))
 
         if not slide_paths:
             logger.warning(f"No images found in {directory}")
