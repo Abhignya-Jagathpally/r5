@@ -356,21 +356,39 @@ class HyperparameterSearcher:
         Raises:
             RuntimeError: If search fails
         """
-        from sklearn.model_selection import StratifiedKFold
+        from sklearn.model_selection import StratifiedKFold, StratifiedGroupKFold
 
         self.logger.info(
             f"Running {self.config.num_folds}-fold CV search for {model_type}"
         )
 
-        skf = StratifiedKFold(
-            n_splits=self.config.num_folds, shuffle=True, random_state=self.config.seed
-        )
+        # Use patient-level CV if patient_ids are available
+        patient_ids = getattr(data, "patient_ids", None)
+        if patient_ids is None and hasattr(data, "__len__") and isinstance(data, np.ndarray) is False:
+            # Try to extract from dataframe-like objects
+            patient_ids = getattr(data, "patient_id", None)
+
+        if patient_ids is not None:
+            self.logger.info("Using patient-level StratifiedGroupKFold (no leakage)")
+            kfold = StratifiedGroupKFold(
+                n_splits=self.config.num_folds, shuffle=True, random_state=self.config.seed
+            )
+            split_iter = kfold.split(data, labels, groups=patient_ids)
+        else:
+            self.logger.warning(
+                "No patient_ids available — falling back to sample-level StratifiedKFold. "
+                "Risk of patient-level leakage if multiple samples per patient."
+            )
+            kfold = StratifiedKFold(
+                n_splits=self.config.num_folds, shuffle=True, random_state=self.config.seed
+            )
+            split_iter = kfold.split(data, labels)
 
         cv_results = []
         fold_idx = 0
 
         try:
-            for train_idx, val_idx in skf.split(data, labels):
+            for train_idx, val_idx in split_iter:
                 fold_idx += 1
                 self.logger.info(f"Running fold {fold_idx}/{self.config.num_folds}")
 

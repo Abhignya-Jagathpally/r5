@@ -79,6 +79,40 @@ class ClassificationMetrics:
             indices.extend(patient_mask.tolist())
         return np.array(indices)
 
+    @staticmethod
+    def _validate_predictions(y_true, y_pred_proba, metric_name: str = "metric"):
+        """Validate inputs before computing metrics."""
+        unique_classes = np.unique(y_true)
+        if len(unique_classes) < 2:
+            logger.warning(
+                f"Cannot compute {metric_name}: only {len(unique_classes)} class(es) present. "
+                f"Need at least 2. Returning NaN."
+            )
+            return False
+
+        # Check minimum class size for reliable estimates
+        min_class_size = min(np.sum(y_true == c) for c in unique_classes)
+        if min_class_size < 5:
+            logger.warning(
+                f"{metric_name}: smallest class has only {min_class_size} samples. "
+                f"Results may be unreliable (recommend >= 10 per class)."
+            )
+
+        # Check predicted probabilities are calibrated (not constant)
+        if y_pred_proba is not None and len(y_pred_proba.shape) <= 1:
+            if np.std(y_pred_proba) < 1e-8:
+                logger.warning(
+                    f"{metric_name}: predicted probabilities are near-constant "
+                    f"(std={np.std(y_pred_proba):.2e}). Model may not be discriminative."
+                )
+            # Check probabilities are in [0, 1]
+            if np.any(y_pred_proba < 0) or np.any(y_pred_proba > 1):
+                logger.warning(
+                    f"{metric_name}: predicted probabilities outside [0,1] range. "
+                    f"Min={y_pred_proba.min():.4f}, Max={y_pred_proba.max():.4f}"
+                )
+        return True
+
     def compute_auroc(
         self,
         y_true: np.ndarray,
@@ -99,6 +133,9 @@ class ClassificationMetrics:
         """
         y_true = np.asarray(y_true)
         y_pred_proba = np.asarray(y_pred_proba)
+
+        if not self._validate_predictions(y_true, y_pred_proba, "AUROC"):
+            return {"auroc": MetricResult(float("nan"), float("nan"), float("nan"))}
 
         # Binarize labels if multiclass
         if len(y_pred_proba.shape) > 1 and y_pred_proba.shape[1] > 2:
@@ -316,6 +353,15 @@ class ClassificationMetrics:
         if len(np.unique(y_true)) != 2:
             raise ValueError("This metric requires binary labels")
 
+        # Minimum class size check
+        n_pos = np.sum(y_true == 1)
+        n_neg = np.sum(y_true == 0)
+        if n_pos < 5 or n_neg < 5:
+            logger.warning(
+                f"Sensitivity/specificity: small class sizes (pos={n_pos}, neg={n_neg}). "
+                f"Results may be unreliable. Recommend >= 10 per class."
+            )
+
         # Confusion matrix: [[TN, FP], [FN, TP]]
         cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
         tn, fp, fn, tp = cm[0, 0], cm[0, 1], cm[1, 0], cm[1, 1]
@@ -434,16 +480,45 @@ class SurvivalMetrics:
         time_to_event = np.asarray(time_to_event, dtype=float)
         predicted_risk = np.asarray(predicted_risk, dtype=float)
 
-        # Compute C-index manually
         def compute_cindex(event, time, risk):
+            """Harrell's C-index with proper censoring handling.
+
+            A pair (i, j) is comparable only if:
+            - time[i] < time[j] AND event[i] == True (i experienced the event)
+            Censored subjects at the shorter time are NOT comparable because
+            we don't know their true event time.
+
+            Uses lifelines if available for O(n log n); falls back to
+            corrected O(n^2) implementation.
+            """
+            try:
+                from lifelines.utils import concordance_index as ci_fn
+                # lifelines: higher predicted = longer survival
+                return ci_fn(time, -risk, event)
+            except ImportError:
+                pass
+
             concordant = 0
             comparable = 0
 
             for i in range(len(time)):
+                if not event[i]:
+                    # Censored at time[i] — can only compare if j has event
+                    # before censoring time, but that's handled by j's iteration
+                    continue
                 for j in range(len(time)):
                     if i == j:
                         continue
+                    # Pair is comparable only if subject i had an event
+                    # and time[i] < time[j] (or time[i] == time[j] and j is censored)
                     if time[i] < time[j]:
+                        comparable += 1
+                        if risk[i] > risk[j]:
+                            concordant += 1
+                        elif risk[i] == risk[j]:
+                            concordant += 0.5
+                    elif time[i] == time[j] and not event[j]:
+                        # Tie in time: i had event, j censored — comparable
                         comparable += 1
                         if risk[i] > risk[j]:
                             concordant += 1

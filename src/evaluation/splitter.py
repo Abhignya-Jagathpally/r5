@@ -285,9 +285,23 @@ class TimeAwareSplitter(PatientLevelSplitter):
         if time_col not in data.columns:
             raise ValueError(f"Time column '{time_col}' not found")
 
-        # Get unique patients with their earliest time point
+        # Get unique patients with their earliest time point.
+        # For longitudinal studies, ALL time points for a patient go into the
+        # same split (determined by earliest scan). This prevents within-patient
+        # temporal leakage where later scans from a training patient appear in
+        # the test set.
         patient_times = data.groupby(patient_col)[time_col].min()
         unique_patients = patient_times.index.values
+
+        # Warn about multi-timepoint patients
+        multi_tp = data.groupby(patient_col)[time_col].nunique()
+        n_multi = (multi_tp > 1).sum()
+        if n_multi > 0:
+            logger.info(
+                f"Time-aware split: {n_multi}/{len(unique_patients)} patients have "
+                f"multiple time points. All time points for each patient assigned "
+                f"to the same split (determined by earliest scan)."
+            )
 
         # Determine cutoffs
         if val_time_cutoff is None:
