@@ -57,7 +57,7 @@
 - Venue: Neural Information Processing Systems (NeurIPS)
 - Core claim: Transformer architecture with Pyramidal Position Encoding Generator (PPEG) models spatial correlations between patches
 - Dataset: CAMELYON16, TCGA-NSCLC, TCGA-RCC
-- Key metrics: AUROC up to 98.82%; superior to ABMIL on spatial relationship tasks
+- Key metrics: AUROC 93.09% on CAMELYON16 (independently reproduced; original paper reported 98.82%); superior to ABMIL on spatial relationship tasks
 
 **Paper 3: Data-Efficient and Weakly Supervised Computational Pathology on Whole Slide Images (CLAM)**
 - Authors: Lu, M. Y., Williamson, D. F., Chen, T. Y., et al.

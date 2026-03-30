@@ -95,4 +95,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENTRYPOINT ["python", "main.py"]
 
 # Default args
-CMD ["--config", "configs/pipeline.json", "--stages", "all"]
+CMD ["--config", "configs/pipeline.yaml", "--stages", "all"]

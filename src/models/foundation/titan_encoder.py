@@ -293,17 +293,40 @@ class TITANEncoder(nn.Module):
             - Batch processing of tiles
             - Aggregation strategy (mean, attention-weighted, etc.)
         """
+        slide_path = Path(slide_path)
+
+        # Check if pre-extracted tiles exist in a subdirectory
+        tile_dir = slide_path.parent / slide_path.stem
+        tile_extensions = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
+        tile_paths = []
+        if tile_dir.is_dir():
+            for ext in tile_extensions:
+                tile_paths.extend(tile_dir.glob(f"*{ext}"))
+                tile_paths.extend(tile_dir.glob(f"*{ext.upper()}"))
+
+        if tile_paths:
+            logger.info(f"Found {len(tile_paths)} pre-extracted tiles for {slide_path.name}")
+            result = self.extract_from_patches(sorted(tile_paths), aggregate=True)
+            embedding = result["aggregated_embedding"] if isinstance(result, dict) else result.mean(axis=0)
+            return {
+                "slide_path": str(slide_path),
+                "slide_embedding": embedding.astype(np.float32),
+                "num_patches": len(tile_paths),
+                "magnification": None,
+            }
+
+        # No tiles found — cannot process raw WSI without openslide integration
         logger.warning(
-            f"TITAN extract_slide() is a PLACEHOLDER — returning zero embeddings for {slide_path}. "
-            "For real inference, install TITAN from https://github.com/mahmoodlab/TITAN "
-            "and provide pretrained weights."
+            f"TITAN: No pre-extracted tiles found for {slide_path.name}. "
+            f"Returning zero embedding. To use TITAN on raw WSIs, extract tiles "
+            f"first with WSITiler or provide tiles in {tile_dir}/"
         )
         return {
             "slide_path": str(slide_path),
             "slide_embedding": np.zeros(self.embedding_dim_slide, dtype=np.float32),
             "num_patches": 0,
             "magnification": None,
-            "_placeholder": True,
+            "_no_tiles": True,
         }
 
     @torch.no_grad()

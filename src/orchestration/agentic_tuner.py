@@ -444,12 +444,47 @@ class AgenticTuner:
             return elapsed_hours >= self.config.max_hours
 
     def _verify_code_integrity(self):
-        """Verify that locked code hasn't been modified."""
+        """Verify that locked code hasn't been modified since first run.
+
+        Maintains a hash database (.integrity_hashes.json) in the working
+        directory. On first call, stores hashes. On subsequent calls,
+        compares current hashes against stored ones.
+        """
+        hash_db_path = Path(".integrity_hashes.json")
+
+        # Load existing hash DB if it exists
+        stored_hashes = {}
+        if hash_db_path.exists():
+            with open(hash_db_path) as f:
+                stored_hashes = json.load(f)
+
+        current_hashes = {}
+        violations = []
+
         for locked_file in self.locked.locked_files:
-            file_hash = self._compute_file_hash(locked_file)
-            # On first run, store hashes
-            # On subsequent runs, compare
-            # This is simplified; production version would maintain hash database
+            locked_path = Path(locked_file)
+            if not locked_path.exists():
+                self.logger.warning(f"Locked file not found: {locked_file}")
+                continue
+
+            file_hash = self._compute_file_hash(locked_path)
+            current_hashes[str(locked_file)] = file_hash
+
+            if str(locked_file) in stored_hashes:
+                if stored_hashes[str(locked_file)] != file_hash:
+                    violations.append(locked_file)
+
+        if violations:
+            raise RuntimeError(
+                f"Code integrity violation: {len(violations)} locked file(s) modified: "
+                f"{violations}. Agentic tuning cannot proceed with modified locked code."
+            )
+
+        # Store/update hash DB
+        with open(hash_db_path, "w") as f:
+            json.dump(current_hashes, f, indent=2)
+
+        self.logger.info(f"Code integrity verified: {len(current_hashes)} locked files OK")
 
     def _verify_preprocessing_contract(self):
         """Verify preprocessing contract hash hasn't changed."""

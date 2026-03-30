@@ -32,7 +32,7 @@ This directory contains comprehensive publication-quality literature review and 
 - **t(11;14) Detection:** AUROC 0.85-0.925, sensitivity 88-91.67%, specificity 83.1-92.20%
 - **PET/CT Radiomics:** High-risk prediction AUC 0.89, OS C-index 0.60-0.657
 - **Flow Cytometry:** Clonality detection sensitivity 96% vs morphology 84%
-- **MIL Models:** CAMELYON16 AUROC 98.82% (TransMIL), DTFD-MIL state-of-the-art
+- **MIL Models:** CAMELYON16 AUROC 93.09% (TransMIL, independently reproduced), DTFD-MIL state-of-the-art
 - **Foundation Models:** Prov-GigaPath achieves AUROC ≥0.90 on 6 cancer subtypes, but 5-15% domain shift to new medical centers
 - **Lytic Lesion Detection:** 91.6% sensitivity, 84.6% specificity, AUROC 0.904
 

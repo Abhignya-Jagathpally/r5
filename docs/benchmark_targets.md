@@ -150,7 +150,7 @@ This document catalogs all published benchmark metrics relevant to the MM imagin
 
 | Metric | Value | Dataset |
 |--------|-------|---------|
-| **CAMELYON16 AUROC** | 98.82% | State-of-the-art at 2021 |
+| **CAMELYON16 AUROC** | 93.09% (reproduced; paper claimed 98.82%) | Independently validated |
 | **TCGA-NSCLC AUROC** | High | Spatial modeling improves over ABMIL |
 | **TCGA-RCC AUROC** | High | Consistent improvement across cancer types |
 | **Reference** | NeurIPS 2021 | Pyramidal Position Encoding enables spatial awareness |
@@ -184,7 +184,7 @@ This document catalogs all published benchmark metrics relevant to the MM imagin
 | **Reference** | Scientific Reports (2024) | First large-scale MIL study on MM |
 
 ### Implications
-- **CAMELYON16 AUROC 98.60-98.82%** is near-human performance but on controlled, single-modality cancer detection task
+- **CAMELYON16 AUROC ~93-96%** on independent reproduction (original papers claimed 98%+; discrepancies noted in 2025 MIL benchmark studies)
 - **MIL methods transfer well to hematological malignancies** when cell-level or slide-level training data available
 - **MIL benchmarks often cherry-picked datasets** — cross-cohort generalization not always tested (challenge from 2025 "Do MIL Models Transfer?" paper)
 
@@ -325,7 +325,7 @@ This document catalogs all published benchmark metrics relevant to the MM imagin
 | **OS Prediction (PET/CT)** | C-index | 0.657 | DeepSurv Radiomics | N=443 | Computers Biol 2025 |
 | **Lytic Lesion Detection (CT)** | Sensitivity | 91.6% | U-Net + YOLO | 40 CTs | Skeletal Radiol 2022 |
 | **Flow Clonality Detection** | Sensitivity | 96% | Multiparametric FCM | Varies | Haematologica 2013 |
-| **WSI Classification (CAMELYON16)** | AUROC | 98.82% | TransMIL | 400 WSI | NeurIPS 2021 |
+| **WSI Classification (CAMELYON16)** | AUROC | 93.09% (reproduced) | TransMIL | 400 WSI | NeurIPS 2021 |
 | **Foundation Model (MSI Prediction)** | Balanced Accuracy | 0.778 | CONCH | PAIP validation | Nature Med 2024 |
 | **Foundation Model (Subtyping)** | AUROC | ≥0.90 | Prov-GigaPath | 6 cancer types | Nature 2024 |
 | **Stain Normalization Impact** | Accuracy Gain | 3-8% | Macenko/others | Multiple | arXiv 2024 |
