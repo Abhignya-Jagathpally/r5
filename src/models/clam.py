@@ -39,10 +39,11 @@ class AttentionLayer(nn.Module):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
 
-        # Query transformation
+        # Query and Key transformations (Lu et al. 2021)
         self.q = nn.Linear(input_dim, attention_dim)
+        self.k = nn.Linear(input_dim, attention_dim)
 
-        # Key/Value transformation
+        # Value transformation
         self.v = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
@@ -56,7 +57,7 @@ class AttentionLayer(nn.Module):
         self,
         embeddings: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass.
+        """Forward pass per Lu et al. 2021 CLAM paper.
 
         Args:
             embeddings: (num_tiles, input_dim)
@@ -64,11 +65,12 @@ class AttentionLayer(nn.Module):
         Returns:
             (aggregated, attention_weights)
         """
-        # Compute queries
+        # Compute queries and keys
         q = self.q(embeddings)  # (num_tiles, attention_dim)
+        k = self.k(embeddings)  # (num_tiles, attention_dim)
 
-        # Compute attention scores
-        scores = torch.mm(q, q.t()) * self.scale  # (num_tiles, num_tiles)
+        # Compute attention scores: Q · K^T (not Q · Q^T)
+        scores = torch.mm(q, k.t()) * self.scale  # (num_tiles, num_tiles)
         attention_weights = F.softmax(scores.sum(dim=1), dim=0)  # (num_tiles,)
 
         # Transform to values

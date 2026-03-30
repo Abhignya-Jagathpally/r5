@@ -30,13 +30,12 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 &
 RUN python3.10 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy requirements
+# Copy requirements and project metadata
 COPY requirements.txt /tmp/requirements.txt
-COPY requirements-dev.txt /tmp/requirements-dev.txt
+COPY pyproject.toml /tmp/pyproject.toml
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
-    pip install --no-cache-dir -r /tmp/requirements-dev.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # ============================================================================
 # Stage 2: Runtime
@@ -74,6 +73,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 WORKDIR /workspace
 
 # Copy source code
+COPY main.py /workspace/
 COPY src/ /workspace/src/
 COPY configs/ /workspace/configs/
 COPY scripts/ /workspace/scripts/
@@ -92,7 +92,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')" || exit 1
 
 # Default entrypoint
-ENTRYPOINT ["python", "-m", "src.orchestration"]
+ENTRYPOINT ["python", "main.py"]
 
-# Allow overriding entrypoint
-CMD ["--help"]
+# Default args
+CMD ["--config", "configs/pipeline.json", "--stages", "all"]

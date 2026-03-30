@@ -63,11 +63,28 @@ class ClassificationMetrics:
         self.bootstrap_iterations = bootstrap_iterations
         self.rng = np.random.RandomState(random_seed)
 
+    def _patient_bootstrap_indices(
+        self, patient_ids: np.ndarray, n_samples: int,
+    ) -> np.ndarray:
+        """Resample at the patient level, returning sample-level indices.
+
+        This ensures bootstrap CIs respect patient-level structure and are
+        not artificially tight due to within-patient correlation.
+        """
+        unique_patients = np.unique(patient_ids)
+        resampled_patients = self.rng.choice(unique_patients, size=len(unique_patients), replace=True)
+        indices = []
+        for pid in resampled_patients:
+            patient_mask = np.where(patient_ids == pid)[0]
+            indices.extend(patient_mask.tolist())
+        return np.array(indices)
+
     def compute_auroc(
         self,
         y_true: np.ndarray,
         y_pred_proba: np.ndarray,
-        average: str = "macro"
+        average: str = "macro",
+        patient_ids: Optional[np.ndarray] = None,
     ) -> Dict[str, MetricResult]:
         """
         Compute AUROC with bootstrap CI.
@@ -106,10 +123,13 @@ class ClassificationMetrics:
         else:
             main_auroc = roc_auc_score(y_true, y_pred_proba, average=average)
 
-        # Bootstrap CI
+        # Bootstrap CI (patient-level if patient_ids provided)
         bootstrap_aurocs = []
         for _ in range(self.bootstrap_iterations):
-            idx = self.rng.choice(len(y_true), size=len(y_true), replace=True)
+            if patient_ids is not None:
+                idx = self._patient_bootstrap_indices(np.asarray(patient_ids), len(y_true))
+            else:
+                idx = self.rng.choice(len(y_true), size=len(y_true), replace=True)
             try:
                 if average is None and len(y_pred_proba.shape) > 1:
                     aurocs = []

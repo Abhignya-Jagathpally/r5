@@ -76,8 +76,9 @@ class FeatureSelector:
         elif self.method == "lasso":
             if y is None:
                 raise ValueError("LASSO requires target variable y")
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
+            # Store scaler to apply same transform to test data (no leakage)
+            self._scaler = StandardScaler()
+            X_scaled = self._scaler.fit_transform(X)
 
             lasso = Lasso(alpha=0.01, max_iter=10000)
             lasso.fit(X_scaled, y)

@@ -63,14 +63,17 @@ class CoxPartialLikelihoodLoss(nn.Module):
         Returns:
             Scalar loss value
         """
-        # Sort by event time
+        # Sort by event time (descending: latest events first)
         sorted_indices = torch.argsort(event_times, descending=True)
         sorted_times = event_times[sorted_indices]
         sorted_scores = risk_scores[sorted_indices]
         sorted_events = event_indicators[sorted_indices]
 
-        # Cumulative sum of risk scores from right to left
-        cumsum_scores = torch.cumsum(sorted_scores.exp(), dim=0)
+        # Risk set: for each event at time t_i, the at-risk set includes all
+        # subjects with event time >= t_i. With descending sort, the at-risk
+        # set at position i is the REVERSE cumsum (from end to start).
+        exp_scores = sorted_scores.exp()
+        cumsum_scores = torch.cumsum(exp_scores.flip(0), dim=0).flip(0)
 
         # Loss for each event
         loss = 0.0
@@ -82,8 +85,8 @@ class CoxPartialLikelihoodLoss(nn.Module):
                 risk_score = sorted_scores[i]
                 risk_set_sum = cumsum_scores[i]
 
-                # Log loss for this event
-                loss += -risk_score + torch.log(risk_set_sum)
+                # Negative log partial likelihood for this event
+                loss += -risk_score + torch.log(risk_set_sum + 1e-8)
                 n_events += 1
 
         # Normalize by number of events

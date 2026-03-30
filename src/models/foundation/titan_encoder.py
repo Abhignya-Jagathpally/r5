@@ -293,14 +293,17 @@ class TITANEncoder(nn.Module):
             - Batch processing of tiles
             - Aggregation strategy (mean, attention-weighted, etc.)
         """
-        logger.info(f"Extracting features from {slide_path}")
-        # This would integrate with actual slide reading in practice
-        # For now, return placeholder structure
+        logger.warning(
+            f"TITAN extract_slide() is a PLACEHOLDER — returning zero embeddings for {slide_path}. "
+            "For real inference, install TITAN from https://github.com/mahmoodlab/TITAN "
+            "and provide pretrained weights."
+        )
         return {
             "slide_path": str(slide_path),
-            "slide_embedding": np.random.randn(self.embedding_dim_slide).astype(np.float32),
+            "slide_embedding": np.zeros(self.embedding_dim_slide, dtype=np.float32),
             "num_patches": 0,
             "magnification": None,
+            "_placeholder": True,
         }
 
     @torch.no_grad()
