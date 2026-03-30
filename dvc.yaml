@@ -3,7 +3,7 @@
 
 stages:
   tile_wsis:
-    cmd: python -m src.preprocessing.wsi_tiling
+    cmd: python scripts/run_preprocessing.py --steps tiling
       --input data/wsis
       --output results/tiles
       --tile_size 256
@@ -18,7 +18,7 @@ stages:
           cache: false
 
   normalize_tiles:
-    cmd: python -m src.preprocessing.stain_normalize
+    cmd: python scripts/run_preprocessing.py --steps stain_norm
       --input results/tiles
       --output results/normalized_tiles
       --method macenko
@@ -30,7 +30,7 @@ stages:
           glob: "*.npz"
 
   deduplicate:
-    cmd: python -m src.preprocessing.deduplicate
+    cmd: python scripts/run_preprocessing.py --steps dedup
       --input results/normalized_tiles
       --output results/deduplicated_tiles
       --threshold 0.95
@@ -49,7 +49,7 @@ stages:
             results/dedup_stats: [num_removed]
 
   extract_embeddings:
-    cmd: python -m src.preprocessing.extract_embeddings
+    cmd: python scripts/run_preprocessing.py --steps embeddings
       --input results/deduplicated_tiles
       --output results/embeddings/uni
       --backbone uni
@@ -62,7 +62,7 @@ stages:
           glob: "*.h5"
 
   extract_radiomics:
-    cmd: python -m src.preprocessing.extract_radiomics
+    cmd: python scripts/run_preprocessing.py --steps radiomics
       --image_dir data/imaging
       --output results/radiomics
       --features shape glcm glrlm
@@ -94,7 +94,7 @@ stages:
           y: num_samples
 
   train_baseline_abmil:
-    cmd: python -m src.training.train_baseline
+    cmd: python scripts/train_baselines.py
       --model_type abmil
       --embeddings_dir results/embeddings
       --splits_dir results/splits
@@ -121,7 +121,7 @@ stages:
               - val_auroc
 
   train_baseline_clam:
-    cmd: python -m src.training.train_baseline
+    cmd: python scripts/train_baselines.py
       --model_type clam
       --embeddings_dir results/embeddings
       --splits_dir results/splits
@@ -142,7 +142,7 @@ stages:
       - results/models/baseline_clam/training_curves.csv
 
   train_baseline_transmil:
-    cmd: python -m src.training.train_baseline
+    cmd: python scripts/train_baselines.py
       --model_type transmil
       --embeddings_dir results/embeddings
       --splits_dir results/splits
@@ -163,7 +163,7 @@ stages:
       - results/models/baseline_transmil/training_curves.csv
 
   train_foundation_uni:
-    cmd: python -m src.training.train_foundation
+    cmd: python scripts/extract_foundation_features.py
       --foundation_type uni
       --embeddings_dir results/embeddings
       --splits_dir results/splits
@@ -182,7 +182,7 @@ stages:
           cache: false
 
   train_foundation_gigapath:
-    cmd: python -m src.training.train_foundation
+    cmd: python scripts/extract_foundation_features.py
       --foundation_type gigapath
       --embeddings_dir results/embeddings
       --splits_dir results/splits
@@ -201,7 +201,7 @@ stages:
           cache: false
 
   train_fusion:
-    cmd: python -m src.training.train_fusion
+    cmd: python main.py --config configs/pipeline.json --stages fusion
       --embeddings_dir results/embeddings
       --radiomics_dir results/radiomics
       --splits_dir results/splits

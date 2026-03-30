@@ -69,15 +69,25 @@ class AttentionLayer(nn.Module):
         q = self.q(embeddings)  # (num_tiles, attention_dim)
         k = self.k(embeddings)  # (num_tiles, attention_dim)
 
-        # Compute attention scores: Q · K^T (not Q · Q^T)
+        # Compute attention scores: Q · K^T per Lu et al. 2021
         scores = torch.mm(q, k.t()) * self.scale  # (num_tiles, num_tiles)
-        attention_weights = F.softmax(scores.sum(dim=1), dim=0)  # (num_tiles,)
+
+        # Apply softmax row-wise (each tile attends over all tiles)
+        attn_matrix = F.softmax(scores, dim=1)  # (num_tiles, num_tiles)
 
         # Transform to values
         v = self.v(embeddings)  # (num_tiles, hidden_dim)
 
+        # Context vectors: each tile's attended representation
+        context = torch.mm(attn_matrix, v)  # (num_tiles, hidden_dim)
+
+        # Pool across tiles: attention-weighted sum using column-wise
+        # importance (how much each tile is attended to by all others)
+        attention_weights = attn_matrix.sum(dim=0)  # (num_tiles,)
+        attention_weights = attention_weights / (attention_weights.sum() + 1e-8)
+
         # Aggregate
-        aggregated = torch.sum(v * attention_weights.unsqueeze(1), dim=0)
+        aggregated = torch.sum(context * attention_weights.unsqueeze(1), dim=0)
 
         return aggregated, attention_weights
 

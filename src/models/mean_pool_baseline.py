@@ -102,18 +102,24 @@ class MeanPoolBaseline:
         y: np.ndarray,
         verbose: bool = True,
     ) -> Dict[str, float]:
-        """Fit all classifiers.
+        """Fit all classifiers on TRAINING data only.
+
+        IMPORTANT: X must contain only training samples. The scaler is
+        fit here and reused in predict()/predict_proba(). Passing combined
+        train+test data causes data leakage.
 
         Args:
-            X: Mean-pooled embeddings (num_samples, embedding_dim)
-            y: Labels (num_samples,)
+            X: Mean-pooled embeddings (num_train_samples, embedding_dim)
+            y: Labels (num_train_samples,)
             verbose: Print training progress
 
         Returns:
             Dictionary with training metrics for each classifier
         """
-        # Standardize features
-        X_scaled = self.scaler.fit_transform(X)
+        # Standardize features — scaler is fit on training data only.
+        # predict() and predict_proba() call scaler.transform() (no re-fit).
+        self.scaler.fit(X)
+        X_scaled = self.scaler.transform(X)
 
         results = {}
 

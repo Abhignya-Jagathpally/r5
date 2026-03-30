@@ -83,7 +83,7 @@ if STAGES.get("tiling", True):
             time_min=120,
         shell:
             """
-            python -m src.preprocessing.wsi_tiling \
+            python scripts/run_preprocessing.py --steps tiling \
                 --input {input.wsi_dir}/{wildcards.patient_id} \
                 --output {output.tiles} \
                 --tile_size {params.tile_size} \
@@ -112,7 +112,7 @@ if STAGES.get("stain_norm", True):
             threads=2,
         shell:
             """
-            python -m src.preprocessing.stain_normalize \
+            python scripts/run_preprocessing.py --steps stain_norm \
                 --input {input.tiles} \
                 --output {output.normalized} \
                 --method {params.method}
@@ -141,7 +141,7 @@ if STAGES.get("dedup", True):
             threads=2,
         shell:
             """
-            python -m src.preprocessing.deduplicate \
+            python scripts/run_preprocessing.py --steps dedup \
                 --input {input.normalized} \
                 --output {output.deduplicated} \
                 --stats {output.stats} \
@@ -175,7 +175,7 @@ if STAGES.get("embeddings", True):
             time_min=60,
         shell:
             """
-            python -m src.preprocessing.extract_embeddings \
+            python scripts/run_preprocessing.py --steps embeddings \
                 --input {input.tiles} \
                 --output {output.embeddings} \
                 --backbone {params.backbone} \
@@ -208,7 +208,7 @@ if STAGES.get("radiomics", True):
             time_min=30,
         shell:
             """
-            python -m src.preprocessing.extract_radiomics \
+            python scripts/run_preprocessing.py --steps radiomics \
                 --image {input.image} \
                 --mask {input.mask} \
                 --output {output.features} \
@@ -288,7 +288,7 @@ rule train_baseline:
         time_min=180,
     shell:
         """
-        python -m src.training.train_baseline \
+        python scripts/train_baselines.py \
             --embeddings_dir {EMBEDDINGS_DIR} \
             --splits_dir {SPLITS_DIR} \
             --output_dir $(dirname {output.model}) \
@@ -329,7 +329,7 @@ rule train_foundation:
         time_min=240,
     shell:
         """
-        python -m src.training.train_foundation \
+        python scripts/extract_foundation_features.py \
             --embeddings_dir {EMBEDDINGS_DIR} \
             --splits_dir {SPLITS_DIR} \
             --output_dir $(dirname {output.model}) \
@@ -372,7 +372,7 @@ if STAGES.get("fusion", True):
             time_min=240,
         shell:
             """
-            python -m src.training.train_fusion \
+            python main.py --config configs/pipeline.json --stages fusion \
                 --embeddings_dir {EMBEDDINGS_DIR} \
                 --radiomics_dir {RADIOMICS_DIR} \
                 --splits_dir {SPLITS_DIR} \

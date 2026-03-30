@@ -58,10 +58,14 @@ class FeatureSelector:
         X: np.ndarray,
         y: Optional[np.ndarray] = None,
     ) -> List[str]:
-        """Fit feature selector.
+        """Fit feature selector on TRAINING data only.
+
+        IMPORTANT: X must contain only training samples. The internal scaler
+        (for LASSO) is fit here and reused in transform(). Passing combined
+        train+test data causes data leakage.
 
         Args:
-            X: Feature matrix (num_samples, num_features)
+            X: Feature matrix (num_train_samples, num_features)
             y: Target variable (for LASSO / mutual info)
 
         Returns:
@@ -102,7 +106,10 @@ class FeatureSelector:
         return self.selected_features.tolist()
 
     def transform(self, X: np.ndarray) -> np.ndarray:
-        """Transform data using selected features.
+        """Transform data using selected features (and fitted scaler if LASSO).
+
+        Uses the scaler fitted during fit() so test data is scaled with
+        training statistics only — no leakage.
 
         Args:
             X: Feature matrix
@@ -112,7 +119,11 @@ class FeatureSelector:
         """
         if self.selected_features is None:
             raise RuntimeError("Selector not fitted yet")
-        return X[:, self.selected_features]
+        X_out = X[:, self.selected_features]
+        # Apply stored scaler if LASSO was used (scale with train statistics)
+        if hasattr(self, "_scaler") and self._scaler is not None:
+            X_out = self._scaler.transform(X)[:, self.selected_features]
+        return X_out
 
 
 class CoxProportionalHazards:
