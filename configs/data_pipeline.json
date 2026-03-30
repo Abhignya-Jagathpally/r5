@@ -1,0 +1,78 @@
+{
+  "tiling": {
+    "tile_size": 256,
+    "magnification": 20,
+    "overlap": 0,
+    "min_tissue_fraction": 0.5,
+    "max_workers": 4,
+    "laplacian_threshold": 15.0
+  },
+  "stain_norm": {
+    "method": "macenko",
+    "reference_slide": null,
+    "alpha": 1.0,
+    "beta": 0.15
+  },
+  "quality_filter": {
+    "max_background_fraction": 0.8,
+    "min_laplacian_variance": 15.0,
+    "pen_mark_detection": true
+  },
+  "dedup": {
+    "method": "phash",
+    "hamming_threshold": 8,
+    "remove_duplicates": false,
+    "save_report": true
+  },
+  "embeddings": {
+    "backbone": "resnet50",
+    "embedding_dim": 2048,
+    "pretrained": true,
+    "batch_size": 64,
+    "num_workers": 4,
+    "device": "cuda"
+  },
+  "radiomics": {
+    "enabled": false,
+    "feature_classes": [
+      "firstorder",
+      "shape",
+      "glcm",
+      "glrlm",
+      "glszm",
+      "gldm"
+    ],
+    "bin_width": 25,
+    "resample_spacing": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "normalize": true
+  },
+  "storage": {
+    "raw_dir": "data/raw",
+    "tiles_dir": "data/tiles",
+    "normalized_dir": "data/normalized",
+    "deduplicated_dir": "data/deduplicated",
+    "embeddings_dir": "data/embeddings",
+    "features_dir": "data/features",
+    "logs_dir": "logs"
+  },
+  "processing": {
+    "steps": [
+      "tiling",
+      "quality_filter",
+      "stain_norm",
+      "dedup",
+      "embeddings"
+    ],
+    "resume": true,
+    "skip_existing": true
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "logs/pipeline.log"
+  }
+}

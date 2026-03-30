@@ -1,0 +1,229 @@
+{
+  "pipeline": {
+    "name": "mm_imaging_radiomics_pipeline",
+    "version": "0.1.0",
+    "description": "Multiple Myeloma imaging and radiomics analysis"
+  },
+  "data_dir": "./data",
+  "output_dir": "./results",
+  "log_dir": "./logs",
+  "stages": {
+    "tiling": true,
+    "stain_norm": true,
+    "dedup": true,
+    "embeddings": true,
+    "radiomics": true,
+    "baselines": true,
+    "foundation": true,
+    "fusion": true,
+    "evaluation": true,
+    "report": true
+  },
+  "preprocessing": {
+    "tile_size": 256,
+    "tile_overlap": 0,
+    "tile_format": "npz",
+    "stain_norm_method": "macenko",
+    "dedup_threshold": 0.95,
+    "dedup_method": "ssim",
+    "num_workers": 4,
+    "batch_size": 32
+  },
+  "embeddings": {
+    "backbone": "uni",
+    "checkpoint": null,
+    "batch_size": 32,
+    "layer": "last",
+    "pool_method": "mean",
+    "device": "cuda",
+    "mixed_precision": true,
+    "cache_embeddings": true
+  },
+  "radiomics": {
+    "image_modality": "ct",
+    "normalize_image": true,
+    "resample_voxel_size": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "features": [
+      "shape",
+      "glcm",
+      "glrlm",
+      "glszm",
+      "ngtdm",
+      "firstorder"
+    ],
+    "settings": {
+      "binWidth": 25,
+      "interpolator": "sitkBSpline",
+      "resamplingMethod": "sitkBSpline"
+    }
+  },
+  "data_split": {
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "stratify_by": "outcome",
+    "seed": 42,
+    "patient_level": true,
+    "cv_folds": 5
+  },
+  "baseline_models": [
+    "abmil",
+    "clam",
+    "transmil",
+    "dsmil"
+  ],
+  "baseline_configs": {
+    "abmil": {
+      "hidden_dim": 256,
+      "num_attention_heads": 8,
+      "dropout": 0.25,
+      "learning_rate": 0.0001,
+      "weight_decay": 1e-05
+    },
+    "clam": {
+      "hidden_dim": 256,
+      "num_classes": 2,
+      "dropout": 0.25,
+      "instance_loss_weight": 0.5,
+      "bag_loss_weight": 0.5
+    },
+    "transmil": {
+      "hidden_dim": 256,
+      "num_layers": 2,
+      "num_heads": 8,
+      "dropout": 0.25
+    },
+    "dsmil": {
+      "hidden_dim": 256,
+      "dropout": 0.25,
+      "instance_pool": "attention",
+      "bag_pool": "attention"
+    }
+  },
+  "foundation_models": [
+    "uni",
+    "gigapath"
+  ],
+  "foundation_configs": {
+    "uni": {
+      "pretrained": true,
+      "freeze_backbone": false,
+      "learning_rate": 1e-05,
+      "warmup_steps": 100
+    },
+    "gigapath": {
+      "pretrained": true,
+      "freeze_backbone": false,
+      "learning_rate": 1e-05,
+      "warmup_steps": 100
+    }
+  },
+  "fusion": {
+    "enabled": true,
+    "method": "concat",
+    "pathology_weight": 0.5,
+    "radiomics_weight": 0.5,
+    "hidden_dim": 256,
+    "dropout": 0.25,
+    "learning_rate": 0.0001
+  },
+  "training": {
+    "num_epochs": 50,
+    "batch_size": 32,
+    "learning_rate": 0.0001,
+    "weight_decay": 1e-05,
+    "optimizer": "adamw",
+    "scheduler": "cosine",
+    "warmup_epochs": 5,
+    "early_stopping_patience": 10,
+    "early_stopping_metric": "auroc",
+    "early_stopping_mode": "max",
+    "gradient_clip": 1.0,
+    "mixed_precision": true,
+    "gradient_accumulation_steps": 1
+  },
+  "evaluation": {
+    "metrics": [
+      "auroc",
+      "aupr",
+      "accuracy",
+      "sensitivity",
+      "specificity",
+      "f1_score",
+      "precision",
+      "recall"
+    ],
+    "calibration": true,
+    "confidence_interval": 0.95,
+    "stratified_analysis": true
+  },
+  "resources": {
+    "gpu_per_task": 1,
+    "cpu_per_task": 8,
+    "memory_gb": 32,
+    "max_parallel_jobs": 4,
+    "gpu_type": "auto"
+  },
+  "agentic_tuning": {
+    "enabled": true,
+    "metric": "auroc",
+    "metric_mode": "max",
+    "budget_type": "trials",
+    "max_trials": 50,
+    "max_hours": 24.0,
+    "metric_improvement_threshold": 0.05,
+    "locked_modules": [
+      "src/data/*",
+      "src/evaluation/splitter.py",
+      "src/evaluation/preprocessing_contract.py"
+    ],
+    "editable_modules": [
+      "configs/model_baselines.yaml",
+      "configs/foundation_models.yaml",
+      "configs/fusion_config.yaml"
+    ]
+  },
+  "hyperparameter_search": {
+    "enabled": true,
+    "scheduler": "asha",
+    "num_samples": 50,
+    "max_concurrent_trials": 4,
+    "grace_period": 10,
+    "reduction_factor": 3,
+    "search_algorithm": "optuna",
+    "max_trials": 100,
+    "max_wall_clock_hours": 48.0
+  },
+  "reproducibility": {
+    "seed": 42,
+    "save_every_n_epochs": 5,
+    "docker": true,
+    "singularity": false,
+    "dvc": true,
+    "environment_snapshot": true,
+    "git_integration": true
+  },
+  "experiment_tracking": {
+    "backend": "mlflow",
+    "experiment_name": "mm_pipeline",
+    "tracking_uri": "http://localhost:5000",
+    "save_artifacts": true,
+    "log_frequency": 10
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": null
+  },
+  "advanced": {
+    "mixed_precision": true,
+    "distributed_training": false,
+    "compile_model": true,
+    "profiling": false,
+    "memory_efficient": true
+  }
+}

@@ -1,0 +1,206 @@
+# Foundation Models Configuration
+# Multiple Myeloma Imaging Pathology & Radiomics Surrogate-Genetics Pipeline
+
+feature_extraction:
+  # Select backbone: resnet50, uni2h, titan
+  backbone: uni2h
+
+  # ResNet50 - classical baseline
+  resnet50:
+    pretrained: imagenet
+    embedding_dim: 2048
+    batch_size: 32
+    num_workers: 4
+
+  # UNI2-h - Pathology foundation model (ViT-H/14)
+  uni2h:
+    model_name: "MahmoodLab/UNI2-h"
+    embedding_dim: 1536
+    batch_size: 64
+    num_workers: 4
+    # CRITICAL: UNI2-h requires HuggingFace authentication
+    # Set HF_TOKEN environment variable or pass hf_token parameter
+    requires_auth: true
+    cache_embeddings: true
+    cache_dir: "${HOME}/.cache/uni2h"
+
+  # TITAN - Multimodal WSI foundation model (2025)
+  titan:
+    model_name: "MahmoodLab/TITAN"
+    embedding_dim_slide: 768
+    embedding_dim_tile: null  # Optional tile-level features
+    batch_size: 16
+    num_workers: 4
+    slide_level: true
+    cache_embeddings: true
+    cache_dir: "${HOME}/.cache/titan"
+
+
+mil_head:
+  # Select type: abmil, transmil, dtfd, hipt
+  type: transmil
+
+  # Attention-Based MIL (baseline)
+  abmil:
+    hidden_dim: 512
+    dropout: 0.1
+
+  # Transformer-based MIL
+  transmil:
+    input_dim: null  # Auto-set from backbone embedding_dim
+    hidden_dim: 512
+    num_heads: 8
+    num_layers: 2
+    dropout: 0.1
+    use_coords: true  # Incorporate tile (x,y) coordinates via positional encoding
+
+  # Double-Tier Feature Distillation MIL
+  dtfd:
+    input_dim: null
+    hidden_dim: 256
+    num_pseudo_bags: 8
+    tier1_hidden: 256
+    tier2_hidden: 128
+    dropout: 0.1
+
+  # Hierarchical region-based MIL
+  hipt:
+    input_dim: null
+    hidden_dim: 512
+    num_regions: 16
+    dropout: 0.1
+
+
+multimodal_fusion:
+  # Select type: early, late, cross_attention, gated
+  type: cross_attention
+
+  # List of modalities to fuse
+  # Available: imaging (from foundation model), radiomics, genomic
+  modalities:
+    - imaging
+    - radiomics
+
+  # Early fusion: concatenate features
+  early:
+    description: "Simple concatenation of all modalities"
+
+  # Late fusion: separate classifiers per modality
+  late:
+    description: "Independent classifiers per modality, learned combination"
+    learned_weights: true
+
+  # Cross-attention fusion: bidirectional attention between modalities
+  cross_attention:
+    description: "Bidirectional cross-attention for modality interaction"
+    num_heads: 4
+    hidden_dim: 256
+
+  # Gated fusion: learn per-sample modality importance
+  gated:
+    description: "Soft gating mechanism for modality weighting"
+    hidden_dim: 128
+
+
+model_training:
+  # Number of classes
+  num_classes: 2
+
+  # Optimizer
+  optimizer:
+    type: adamw
+    learning_rate: 1.0e-4
+    weight_decay: 1.0e-5
+    betas: [0.9, 0.999]
+
+  # Learning rate scheduler
+  scheduler:
+    type: cosine
+    warmup_epochs: 5
+    num_epochs: 50
+
+  # Loss function
+  loss:
+    type: cross_entropy
+    # For imbalanced data, can use weighted CE or focal loss
+    use_class_weights: true
+
+  # Regularization
+  dropout: 0.1
+  layer_norm_eps: 1.0e-6
+
+  # Early stopping
+  early_stopping:
+    patience: 10
+    monitor: val_loss
+    mode: min
+
+  # Batch size
+  batch_size: 32
+  num_workers: 4
+
+
+explainability:
+  # Generate attention visualizations
+  attention_heatmap: true
+  heatmap_resolution: 1024
+
+  # Extract and visualize top-K tiles
+  top_k_tiles: 10
+
+  # GradCAM analysis on tile embeddings
+  gradcam: true
+
+  # SHAP values for radiomics features (if using radiomics)
+  shap_radiomics: true
+  shap_num_samples: 100
+
+  # Report generation
+  generate_reports: true
+  report_format: html  # or png
+  output_dir: "./reports/"
+
+  # Clinical report settings
+  tile_size: 256  # pixels
+  magnification: 20  # 20x, 40x, etc.
+
+
+# Zarr embedding store configuration
+embedding_store:
+  # Base directory for storing extracted embeddings
+  storage_path: "./data/embeddings/"
+
+  # Enable incremental updates (don't re-extract existing)
+  incremental: true
+
+  # Compression
+  compressor: blosc
+  compression_level: 5
+
+  # Chunk size for efficient access
+  chunk_size: 64
+
+
+# GPU/CPU management
+compute:
+  device: cuda  # or cpu
+  mixed_precision: true  # Use float16 where possible
+  num_gpu_workers: 4
+  pin_memory: true
+
+  # Memory management
+  gradient_accumulation_steps: 1
+  gradient_checkpoint: false  # Enables memory-efficient training
+
+
+# Logging and checkpointing
+logging:
+  level: INFO
+  log_dir: "./logs/"
+  tensorboard_dir: "./logs/tensorboard/"
+
+checkpointing:
+  save_dir: "./checkpoints/"
+  save_best_only: true
+  monitor: val_auc  # Monitor this metric for best model
+  save_frequency: 1  # Save every N epochs

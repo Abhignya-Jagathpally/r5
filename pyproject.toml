@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mm-imaging-radiomics-pipeline"
+version = "0.1.0"
+description = "Multiple Myeloma Imaging Pathology & Radiomics Surrogate-Genetics Pipeline"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Abhignya Jagathpally"},
+]
+keywords = [
+    "multiple-myeloma", "digital-pathology", "radiomics",
+    "foundation-models", "multiple-instance-learning", "survival-analysis",
+]
+
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "scikit-image>=0.18.0",
+    "scikit-learn>=0.24.0",
+    "Pillow>=8.3.0",
+    "opencv-python-headless>=4.5.0",
+    "openslide-python>=1.1.2",
+    "imagehash>=4.2.1",
+    "torch>=1.9.0",
+    "torchvision>=0.10.0",
+    "pyarrow>=5.0.0",
+    "zarr>=2.10.0",
+    "pydicom>=2.1.0",
+    "pyradiomics>=3.0.1",
+    "PyYAML>=5.4.0",
+    "tqdm>=4.62.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.2.0",
+    "pytest-cov>=2.12.0",
+    "black>=21.0",
+    "flake8>=3.9.0",
+    "mypy>=0.910",
+]
+tracking = [
+    "mlflow>=1.20.0",
+    "wandb>=0.12.0",
+]
+orchestration = [
+    "ray[tune]>=2.0.0",
+    "dask>=2021.10.0",
+    "optuna>=3.0.0",
+    "snakemake>=7.0.0",
+]
+foundation = [
+    "timm>=0.9.0",
+    "huggingface-hub>=0.14.0",
+    "transformers>=4.30.0",
+]
+
+[project.scripts]
+mm-pipeline = "main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]

@@ -1,0 +1,151 @@
+{
+  "feature_extraction": {
+    "backbone": "uni2h",
+    "resnet50": {
+      "pretrained": "imagenet",
+      "embedding_dim": 2048,
+      "batch_size": 32,
+      "num_workers": 4
+    },
+    "uni2h": {
+      "model_name": "MahmoodLab/UNI2-h",
+      "embedding_dim": 1536,
+      "batch_size": 64,
+      "num_workers": 4,
+      "requires_auth": true,
+      "cache_embeddings": true,
+      "cache_dir": "${HOME}/.cache/uni2h"
+    },
+    "titan": {
+      "model_name": "MahmoodLab/TITAN",
+      "embedding_dim_slide": 768,
+      "embedding_dim_tile": null,
+      "batch_size": 16,
+      "num_workers": 4,
+      "slide_level": true,
+      "cache_embeddings": true,
+      "cache_dir": "${HOME}/.cache/titan"
+    }
+  },
+  "mil_head": {
+    "type": "transmil",
+    "abmil": {
+      "hidden_dim": 512,
+      "dropout": 0.1
+    },
+    "transmil": {
+      "input_dim": null,
+      "hidden_dim": 512,
+      "num_heads": 8,
+      "num_layers": 2,
+      "dropout": 0.1,
+      "use_coords": true
+    },
+    "dtfd": {
+      "input_dim": null,
+      "hidden_dim": 256,
+      "num_pseudo_bags": 8,
+      "tier1_hidden": 256,
+      "tier2_hidden": 128,
+      "dropout": 0.1
+    },
+    "hipt": {
+      "input_dim": null,
+      "hidden_dim": 512,
+      "num_regions": 16,
+      "dropout": 0.1
+    }
+  },
+  "multimodal_fusion": {
+    "type": "cross_attention",
+    "modalities": [
+      "imaging",
+      "radiomics"
+    ],
+    "early": {
+      "description": "Simple concatenation of all modalities"
+    },
+    "late": {
+      "description": "Independent classifiers per modality, learned combination",
+      "learned_weights": true
+    },
+    "cross_attention": {
+      "description": "Bidirectional cross-attention for modality interaction",
+      "num_heads": 4,
+      "hidden_dim": 256
+    },
+    "gated": {
+      "description": "Soft gating mechanism for modality weighting",
+      "hidden_dim": 128
+    }
+  },
+  "model_training": {
+    "num_classes": 2,
+    "optimizer": {
+      "type": "adamw",
+      "learning_rate": 0.0001,
+      "weight_decay": 1e-05,
+      "betas": [
+        0.9,
+        0.999
+      ]
+    },
+    "scheduler": {
+      "type": "cosine",
+      "warmup_epochs": 5,
+      "num_epochs": 50
+    },
+    "loss": {
+      "type": "cross_entropy",
+      "use_class_weights": true
+    },
+    "dropout": 0.1,
+    "layer_norm_eps": 1e-06,
+    "early_stopping": {
+      "patience": 10,
+      "monitor": "val_loss",
+      "mode": "min"
+    },
+    "batch_size": 32,
+    "num_workers": 4
+  },
+  "explainability": {
+    "attention_heatmap": true,
+    "heatmap_resolution": 1024,
+    "top_k_tiles": 10,
+    "gradcam": true,
+    "shap_radiomics": true,
+    "shap_num_samples": 100,
+    "generate_reports": true,
+    "report_format": "html",
+    "output_dir": "./reports/",
+    "tile_size": 256,
+    "magnification": 20
+  },
+  "embedding_store": {
+    "storage_path": "./data/embeddings/",
+    "incremental": true,
+    "compressor": "blosc",
+    "compression_level": 5,
+    "chunk_size": 64
+  },
+  "compute": {
+    "device": "cuda",
+    "mixed_precision": true,
+    "num_gpu_workers": 4,
+    "pin_memory": true,
+    "gradient_accumulation_steps": 1,
+    "gradient_checkpoint": false
+  },
+  "logging": {
+    "level": "INFO",
+    "log_dir": "./logs/",
+    "tensorboard_dir": "./logs/tensorboard/"
+  },
+  "checkpointing": {
+    "save_dir": "./checkpoints/",
+    "save_best_only": true,
+    "monitor": "val_auc",
+    "save_frequency": 1
+  }
+}

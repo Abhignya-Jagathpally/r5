@@ -1,0 +1,263 @@
+# DVC Pipeline Definition
+# MM Imaging Pathology & Radiomics Pipeline
+
+stages:
+  tile_wsis:
+    cmd: python -m src.preprocessing.wsi_tiling
+      --input data/wsis
+      --output results/tiles
+      --tile_size 256
+    deps:
+      - data/wsis
+      - src/preprocessing/wsi_tiling.py
+    outs:
+      - results/tiles:
+          glob: "*.npz"
+    metrics:
+      - results/tiling_metrics.json:
+          cache: false
+
+  normalize_tiles:
+    cmd: python -m src.preprocessing.stain_normalize
+      --input results/tiles
+      --output results/normalized_tiles
+      --method macenko
+    deps:
+      - results/tiles
+      - src/preprocessing/stain_normalize.py
+    outs:
+      - results/normalized_tiles:
+          glob: "*.npz"
+
+  deduplicate:
+    cmd: python -m src.preprocessing.deduplicate
+      --input results/normalized_tiles
+      --output results/deduplicated_tiles
+      --threshold 0.95
+    deps:
+      - results/normalized_tiles
+      - src/preprocessing/deduplicate.py
+    outs:
+      - results/deduplicated_tiles:
+          glob: "*.npz"
+      - results/dedup_stats:
+          glob: "*.json"
+    plots:
+      - results/dedup_stats/summary.json:
+          x: patient_id
+          y:
+            results/dedup_stats: [num_removed]
+
+  extract_embeddings:
+    cmd: python -m src.preprocessing.extract_embeddings
+      --input results/deduplicated_tiles
+      --output results/embeddings/uni
+      --backbone uni
+      --batch_size 32
+    deps:
+      - results/deduplicated_tiles
+      - src/preprocessing/extract_embeddings.py
+    outs:
+      - results/embeddings/uni:
+          glob: "*.h5"
+
+  extract_radiomics:
+    cmd: python -m src.preprocessing.extract_radiomics
+      --image_dir data/imaging
+      --output results/radiomics
+      --features shape glcm glrlm
+    deps:
+      - data/imaging
+      - src/preprocessing/extract_radiomics.py
+    outs:
+      - results/radiomics:
+          glob: "*.csv"
+
+  create_splits:
+    cmd: python -m src.data.create_splits
+      --metadata data/metadata.csv
+      --output results/splits
+      --train_ratio 0.7
+      --val_ratio 0.15
+      --test_ratio 0.15
+      --seed 42
+    deps:
+      - data/metadata.csv
+      - src/data/create_splits.py
+    outs:
+      - results/splits/train_split.json
+      - results/splits/val_split.json
+      - results/splits/test_split.json
+    plots:
+      - results/splits/split_info.json:
+          x: split_name
+          y: num_samples
+
+  train_baseline_abmil:
+    cmd: python -m src.training.train_baseline
+      --model_type abmil
+      --embeddings_dir results/embeddings
+      --splits_dir results/splits
+      --output_dir results/models/baseline_abmil
+      --num_epochs 50
+      --learning_rate 1e-4
+    deps:
+      - results/embeddings
+      - results/splits
+      - src/training/train_baseline.py
+      - configs/pipeline.yaml
+    outs:
+      - results/models/baseline_abmil/best_model.pth
+    metrics:
+      - results/models/baseline_abmil/metrics.json:
+          cache: false
+    plots:
+      - results/models/baseline_abmil/training_curves.csv:
+          x: epoch
+          y:
+            results/models/baseline_abmil/training_curves.csv:
+              - train_loss
+              - val_loss
+              - val_auroc
+
+  train_baseline_clam:
+    cmd: python -m src.training.train_baseline
+      --model_type clam
+      --embeddings_dir results/embeddings
+      --splits_dir results/splits
+      --output_dir results/models/baseline_clam
+      --num_epochs 50
+      --learning_rate 1e-4
+    deps:
+      - results/embeddings
+      - results/splits
+      - src/training/train_baseline.py
+      - configs/pipeline.yaml
+    outs:
+      - results/models/baseline_clam/best_model.pth
+    metrics:
+      - results/models/baseline_clam/metrics.json:
+          cache: false
+    plots:
+      - results/models/baseline_clam/training_curves.csv
+
+  train_baseline_transmil:
+    cmd: python -m src.training.train_baseline
+      --model_type transmil
+      --embeddings_dir results/embeddings
+      --splits_dir results/splits
+      --output_dir results/models/baseline_transmil
+      --num_epochs 50
+      --learning_rate 1e-4
+    deps:
+      - results/embeddings
+      - results/splits
+      - src/training/train_baseline.py
+      - configs/pipeline.yaml
+    outs:
+      - results/models/baseline_transmil/best_model.pth
+    metrics:
+      - results/models/baseline_transmil/metrics.json:
+          cache: false
+    plots:
+      - results/models/baseline_transmil/training_curves.csv
+
+  train_foundation_uni:
+    cmd: python -m src.training.train_foundation
+      --foundation_type uni
+      --embeddings_dir results/embeddings
+      --splits_dir results/splits
+      --output_dir results/models/foundation_uni
+      --num_epochs 50
+      --learning_rate 1e-5
+    deps:
+      - results/embeddings
+      - results/splits
+      - src/training/train_foundation.py
+      - configs/pipeline.yaml
+    outs:
+      - results/models/foundation_uni/best_model.pth
+    metrics:
+      - results/models/foundation_uni/metrics.json:
+          cache: false
+
+  train_foundation_gigapath:
+    cmd: python -m src.training.train_foundation
+      --foundation_type gigapath
+      --embeddings_dir results/embeddings
+      --splits_dir results/splits
+      --output_dir results/models/foundation_gigapath
+      --num_epochs 50
+      --learning_rate 1e-5
+    deps:
+      - results/embeddings
+      - results/splits
+      - src/training/train_foundation.py
+      - configs/pipeline.yaml
+    outs:
+      - results/models/foundation_gigapath/best_model.pth
+    metrics:
+      - results/models/foundation_gigapath/metrics.json:
+          cache: false
+
+  train_fusion:
+    cmd: python -m src.training.train_fusion
+      --embeddings_dir results/embeddings
+      --radiomics_dir results/radiomics
+      --splits_dir results/splits
+      --output_dir results/models/fusion
+      --fusion_method concat
+      --num_epochs 50
+      --learning_rate 1e-4
+    deps:
+      - results/embeddings
+      - results/radiomics
+      - results/splits
+      - src/training/train_fusion.py
+      - configs/pipeline.yaml
+    outs:
+      - results/models/fusion/best_model.pth
+    metrics:
+      - results/models/fusion/metrics.json:
+          cache: false
+    plots:
+      - results/models/fusion/training_curves.csv
+
+  evaluate:
+    cmd: python -m src.evaluation.evaluate_all
+      --models_dir results/models
+      --test_split results/splits/test_split.json
+      --embeddings_dir results/embeddings
+      --radiomics_dir results/radiomics
+      --output_dir results/evaluation
+    deps:
+      - results/models
+      - results/splits
+      - results/embeddings
+      - results/radiomics
+      - src/evaluation/evaluate_all.py
+    metrics:
+      - results/evaluation/evaluation_results.json:
+          cache: false
+    plots:
+      - results/evaluation/roc_curves.csv:
+          x: fpr
+          y: tpr
+          title: ROC Curves
+      - results/evaluation/pr_curves.csv:
+          x: recall
+          y: precision
+          title: PR Curves
+
+  generate_report:
+    cmd: python -m src.evaluation.generate_report
+      --results results/evaluation/evaluation_results.json
+      --curves results/evaluation/roc_curves.png
+      --output results/evaluation/final_report.html
+    deps:
+      - results/evaluation/evaluation_results.json
+      - results/evaluation/roc_curves.png
+      - src/evaluation/generate_report.py
+    outs:
+      - results/evaluation/final_report.html
+      - results/evaluation/evaluation_journal.md

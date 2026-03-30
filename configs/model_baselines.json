@@ -1,0 +1,108 @@
+{
+  "tile_classifier": {
+    "backbone": "resnet50",
+    "pretrained": true,
+    "num_classes": 2,
+    "dropout": 0.5,
+    "learning_rate": 0.0001,
+    "weight_decay": 1e-05,
+    "max_epochs": 50,
+    "patience": 10,
+    "batch_size": 32,
+    "gradient_clip_norm": 1.0,
+    "checkpoint_dir": "checkpoints/tile_classifier"
+  },
+  "abmil": {
+    "input_dim": 2048,
+    "hidden_dim": 256,
+    "attention_dim": 128,
+    "num_classes": 2,
+    "dropout": 0.25,
+    "gated": true,
+    "learning_rate": 0.0002,
+    "weight_decay": 0.0001,
+    "max_epochs": 100,
+    "patience": 15,
+    "batch_size": 4,
+    "gradient_clip_norm": 1.0,
+    "checkpoint_dir": "checkpoints/abmil"
+  },
+  "clam_sb": {
+    "model_type": "clam_sb",
+    "input_dim": 2048,
+    "hidden_dim": 256,
+    "attention_dim": 128,
+    "num_classes": 2,
+    "dropout": 0.25,
+    "inst_cluster": false,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "max_epochs": 100,
+    "patience": 15,
+    "batch_size": 4,
+    "gradient_clip_norm": 1.0,
+    "checkpoint_dir": "checkpoints/clam_sb"
+  },
+  "clam_mb": {
+    "model_type": "clam_mb",
+    "input_dim": 2048,
+    "hidden_dim": 256,
+    "attention_dim": 128,
+    "num_classes": 2,
+    "num_heads": 3,
+    "dropout": 0.25,
+    "inst_cluster": true,
+    "inst_lambda": 0.5,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "max_epochs": 100,
+    "patience": 15,
+    "batch_size": 4,
+    "gradient_clip_norm": 1.0,
+    "checkpoint_dir": "checkpoints/clam_mb"
+  },
+  "mean_pool": {
+    "classifiers": [
+      "logistic_regression",
+      "svm",
+      "random_forest"
+    ],
+    "embedding_dim": 2048,
+    "checkpoint_dir": "checkpoints/mean_pool"
+  },
+  "radiomics_survival": {
+    "feature_selection": "variance",
+    "variance_threshold": 0.01,
+    "n_selected_features": 50,
+    "cox": {
+      "penalizer": 0.0,
+      "checkpoint_dir": "checkpoints/cox"
+    },
+    "rsf": {
+      "n_estimators": 100,
+      "max_depth": 5,
+      "min_samples_split": 2,
+      "checkpoint_dir": "checkpoints/rsf"
+    }
+  },
+  "data": {
+    "zarr_path": "data/embeddings.zarr",
+    "splits_csv": "data/splits.csv",
+    "max_patches": 2000,
+    "sampling_strategy": "all",
+    "num_workers": 4
+  },
+  "training": {
+    "device": "cuda",
+    "seed": 42,
+    "mixed_precision": true,
+    "gradient_accumulation_steps": 1,
+    "log_interval": 10
+  },
+  "logging": {
+    "log_dir": "logs",
+    "save_best_model": true,
+    "save_all_checkpoints": false,
+    "verbose": true
+  }
+}

@@ -1,0 +1,142 @@
+# Evaluation Framework Configuration
+# Multiple Myeloma Imaging Pathology & Radiomics Surrogate-Genetics Pipeline
+
+splitting:
+  method: stratified_patient  # patient, stratified_patient, time_aware, kfold
+  test_size: 0.2
+  val_size: 0.15
+  n_folds: 5  # for kfold
+  seed: 42
+  time_column: diagnosis_date  # for time_aware
+  patient_column: patient_id
+  label_column: label
+
+metrics:
+  classification:
+    - auroc
+    - auprc
+    - accuracy
+    - balanced_accuracy
+    - f1_macro
+    - f1_weighted
+    - sensitivity
+    - specificity
+    - ppv
+    - npv
+  survival:
+    - c_index
+    - ibs
+  calibration:
+    - ece
+    - calibration_curve
+  bootstrap_iterations: 1000
+  confidence_level: 0.95
+
+tracking:
+  backend: mlflow  # mlflow, wandb, or both
+  mlflow:
+    tracking_uri: ./mlruns
+    experiment_name: mm_imaging_pipeline
+    model_registry: true
+  wandb:
+    project: mm-imaging
+    entity: null
+    sweep_enabled: false
+  dvc:
+    enabled: true
+    remote: storage
+  log_environment: true
+  log_reproducibility_info: true
+
+reproducibility:
+  save_preprocessing_contract: true
+  save_split_assignments: true
+  save_environment: true
+  generate_dockerfile: true
+  dvc_tracking: true
+
+visualization:
+  dpi: 300
+  figure_format: [png, pdf]
+  color_palette: colorblind
+  font_size: 12
+  save_individual_folds: false
+  figures_to_generate:
+    - roc_curves
+    - precision_recall
+    - confusion_matrices
+    - calibration_plots
+    - training_curves
+    - feature_importance
+
+reporting:
+  generate_full_report: true
+  generate_summary_table: true
+  generate_csv_summary: true
+  output_dir: ./reports
+  include_benchmarks: true
+
+benchmarks:
+  t11_14_detection:
+    auroc: 0.85
+    sensitivity: 0.88
+    specificity: 0.831
+    source: "H&E-based t(11;14) detection study"
+    year: 2021
+
+  multimodal_t11_14:
+    auroc: 0.892
+    accuracy: 0.87
+    f1_macro: 0.88
+    source: "2024 multimodal morphology+flow cytometry study"
+    year: 2024
+
+  pet_ct_radiomics:
+    c_index: 0.693
+    auroc: 0.71
+    source: "PET/CT radiomics NDMM prognostic study"
+    year: 2023
+
+  multiomics_signature:
+    auroc: 0.76
+    c_index: 0.72
+    source: "Genomic + imaging integration study"
+    year: 2023
+
+preprocessing:
+  normalization:
+    method: zscore  # zscore or minmax
+    fit_on_train_only: true
+
+  imputation:
+    method: median  # median, mean, or mode
+    fit_on_train_only: true
+
+  feature_selection:
+    enabled: true
+    method: lasso  # lasso, variance, mutual_info
+    n_features_to_select: 50
+    fit_on_train_only: true
+
+  stain_normalization:
+    enabled: false
+    method: macenko  # macenko or reinhardt
+    fit_on_train_only: true
+
+validation:
+  check_patient_leakage: true
+  check_data_leakage: true
+  min_samples_per_class: 10
+  check_missing_values: true
+  check_feature_ranges: true
+
+logging:
+  level: INFO
+  log_file: evaluation.log
+  log_to_console: true
+
+paths:
+  data_dir: ./data
+  results_dir: ./results
+  artifacts_dir: ./artifacts
+  preprocessing_dir: ./preprocessing_contracts

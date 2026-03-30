@@ -1,0 +1,81 @@
+# Data processing pipeline configuration for MM imaging
+# Covers WSI tiling, stain normalization, deduplication, and embedding extraction
+
+# WSI Tiling configuration
+tiling:
+  tile_size: 256                    # Size of square tiles in pixels
+  magnification: 20                 # Target magnification level (e.g., 20x)
+  overlap: 0                        # Pixel overlap between adjacent tiles
+  min_tissue_fraction: 0.5          # Minimum fraction of tile that must be tissue (0-1)
+  max_workers: 4                    # Number of parallel workers for tile extraction
+  laplacian_threshold: 15.0         # Threshold for blur detection (Laplacian variance)
+
+# Stain Normalization configuration
+stain_norm:
+  method: macenko                   # Method: 'macenko' or 'reinhard'
+  reference_slide: null             # Path to reference slide; null=auto-select first valid
+  alpha: 1.0                        # Percentile for robust color estimation (Macenko)
+  beta: 0.15                        # Threshold for stain estimation (Macenko)
+
+# Quality filtering configuration
+quality_filter:
+  max_background_fraction: 0.8      # Skip tiles >80% background (white)
+  min_laplacian_variance: 15.0      # Skip blurry tiles (Laplacian variance)
+  pen_mark_detection: true          # Detect and skip tiles with pen marks
+
+# Tile deduplication configuration
+dedup:
+  method: phash                     # Hash method: 'phash', 'ahash', 'dhash', 'whash'
+  hamming_threshold: 8              # Hamming distance threshold for near-duplicates
+  remove_duplicates: false          # If true, physically delete duplicate files
+  save_report: true                 # Generate detailed dedup report
+
+# Embedding extraction configuration
+embeddings:
+  backbone: resnet50                # Model: 'resnet50', 'uni2h', 'titan'
+  embedding_dim: 2048              # Output embedding dimension (ResNet50: 2048)
+  pretrained: true                 # Use pretrained weights
+  batch_size: 64                   # Batch size for extraction
+  num_workers: 4                   # Data loading workers
+  device: cuda                     # Device: 'cuda' or 'cpu'
+
+# Radiomics feature extraction configuration
+radiomics:
+  enabled: false                   # Enable radiomics extraction
+  feature_classes:                 # Classes of features to extract
+    - firstorder
+    - shape
+    - glcm
+    - glrlm
+    - glszm
+    - gldm
+  bin_width: 25                    # Bin width for discretization
+  resample_spacing: [1.0, 1.0, 1.0]  # Resampling voxel spacing
+  normalize: true                  # Normalize intensities
+
+# Storage paths
+storage:
+  raw_dir: data/raw                 # Raw WSI directory
+  tiles_dir: data/tiles             # Extracted tiles
+  normalized_dir: data/normalized   # Normalized tiles
+  deduplicated_dir: data/deduplicated  # Deduplicated tiles
+  embeddings_dir: data/embeddings   # Zarr store for embeddings
+  features_dir: data/features       # Radiomics features (parquet)
+  logs_dir: logs                    # Logging output
+
+# Processing configuration
+processing:
+  steps:                            # Steps to execute in order
+    - tiling
+    - quality_filter
+    - stain_norm
+    - dedup
+    - embeddings
+  resume: true                      # Resume from last completed step
+  skip_existing: true               # Skip already-processed slides
+
+# Logging configuration
+logging:
+  level: INFO                       # Log level: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: logs/pipeline.log           # Log file path
