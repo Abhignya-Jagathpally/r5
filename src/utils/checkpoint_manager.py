@@ -14,8 +14,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import torch
-
 logger = logging.getLogger(__name__)
 
 
@@ -49,8 +47,8 @@ class CheckpointManager:
 
     def save(
         self,
-        model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
+        model,
+        optimizer,
         scheduler: Optional[Any],
         epoch: int,
         metrics: Dict[str, float],
@@ -65,11 +63,21 @@ class CheckpointManager:
         filename = f"{self.experiment_id}_epoch{epoch:04d}.pt"
         path = self.checkpoint_dir / filename
 
+        env_info = {"python": sys.version}
+        try:
+            import torch as _torch
+            env_info["torch"] = _torch.__version__
+            env_info["cuda"] = _torch.cuda.is_available()
+            env_info["cuda_version"] = _torch.version.cuda if _torch.cuda.is_available() else None
+        except ImportError:
+            env_info["torch"] = None
+            env_info["cuda"] = False
+
         checkpoint = {
             # Model state
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
+            "model_state_dict": model.state_dict() if hasattr(model, "state_dict") else str(model),
+            "optimizer_state_dict": optimizer.state_dict() if hasattr(optimizer, "state_dict") else None,
+            "scheduler_state_dict": scheduler.state_dict() if scheduler and hasattr(scheduler, "state_dict") else None,
             "epoch": epoch,
             "metrics": metrics,
             # Traceability
@@ -77,18 +85,19 @@ class CheckpointManager:
             "config_hash": self._config_hash(config),
             "git_hash": self._get_git_hash(),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "environment": {
-                "python": sys.version,
-                "torch": torch.__version__,
-                "cuda": torch.cuda.is_available(),
-                "cuda_version": torch.version.cuda if torch.cuda.is_available() else None,
-            },
+            "environment": env_info,
             "experiment_id": self.experiment_id,
         }
         if extra_state:
             checkpoint["extra_state"] = extra_state
 
-        torch.save(checkpoint, path)
+        try:
+            import torch as _torch
+            _torch.save(checkpoint, path)
+        except ImportError:
+            import pickle
+            with open(path, "wb") as f:
+                pickle.dump(checkpoint, f)
         self._saved_paths.append(path)
         logger.info(f"Checkpoint saved: {path} (epoch {epoch}, {self.monitor_metric}={metrics.get(self.monitor_metric, 'N/A')})")
 
@@ -110,8 +119,8 @@ class CheckpointManager:
     def load(
         self,
         checkpoint_path: str,
-        model: torch.nn.Module,
-        optimizer: Optional[torch.optim.Optimizer] = None,
+        model,
+        optimizer=None,
         scheduler: Optional[Any] = None,
         device: str = "cpu",
     ) -> Dict[str, Any]:
@@ -121,7 +130,13 @@ class CheckpointManager:
             Metadata dict (epoch, metrics, config, git_hash, etc.).
         """
         path = Path(checkpoint_path)
-        checkpoint = torch.load(path, map_location=device, weights_only=False)
+        try:
+            import torch as _torch
+            checkpoint = _torch.load(path, map_location=device, weights_only=False)
+        except ImportError:
+            import pickle
+            with open(path, "rb") as f:
+                checkpoint = pickle.load(f)
 
         model.load_state_dict(checkpoint["model_state_dict"])
         if optimizer and checkpoint.get("optimizer_state_dict"):
@@ -158,7 +173,13 @@ class CheckpointManager:
         manifest = []
         for path in sorted(self.checkpoint_dir.glob(pattern)):
             try:
-                ckpt = torch.load(path, map_location="cpu", weights_only=False)
+                try:
+                    import torch as _torch
+                    ckpt = _torch.load(path, map_location="cpu", weights_only=False)
+                except ImportError:
+                    import pickle
+                    with open(path, "rb") as f:
+                        ckpt = pickle.load(f)
                 manifest.append({
                     "path": str(path),
                     "epoch": ckpt.get("epoch"),

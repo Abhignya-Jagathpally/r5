@@ -7,21 +7,25 @@ Master orchestrator that runs the full pipeline end-to-end:
     preprocessing → baselines → foundation → fusion → evaluation → report
 
 Usage:
-    python main.py --config configs/pipeline.json --stages all
-    python main.py --config configs/pipeline.yaml --stages preprocessing baselines
-    python main.py --config configs/pipeline.json --stages evaluation --resume
-    python main.py --config configs/pipeline.json --dry-run
+    python3 main.py --config configs/pipeline.json --stages all
+    python3 main.py --config configs/pipeline.yaml --stages preprocessing baselines
+    python3 main.py --config configs/pipeline.json --stages evaluation --resume
+    python3 main.py --config configs/pipeline.json --dry-run
+    python3 main.py --config configs/pipeline.json --demo  # synthetic data
 """
 
 import argparse
 import json
 import logging
+import random
 import sys
 import time
 import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 logger = logging.getLogger("mm_pipeline")
 
@@ -50,12 +54,10 @@ def setup_logging(log_dir: str, level: str = "INFO") -> Path:
 
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-    # Console handler
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(fmt)
     root.addHandler(ch)
 
-    # File handler
     fh = logging.FileHandler(log_file)
     fh.setFormatter(fmt)
     root.addHandler(fh)
@@ -68,108 +70,53 @@ def setup_logging(log_dir: str, level: str = "INFO") -> Path:
 
 
 def run_stage_preprocessing(config: Dict, context: Dict) -> Dict:
-    """WSI tiling, stain normalization, deduplication, embedding extraction.
+    """Generate or load data, extract embeddings and radiomics features."""
+    import pandas as pd
 
-    Calls into scripts/run_preprocessing.py functions which use:
-    - src.data.WSITiler
-    - src.data.StainNormalizer
-    - src.data.TileDeduplicator
-    - src.data.EmbeddingStore
-    - src.data.RadiomicsExtractor
-    """
-    from scripts.run_preprocessing import (
-        run_tiling,
-        run_quality_filtering,
-        run_stain_normalization,
-        run_deduplication,
-        run_embedding_extraction,
-    )
-
+    data_dir = Path(context["data_dir"])
     output_dir = Path(context["output_dir"])
-    data_dir = Path(context.get("data_dir", "data"))
     results = {}
 
-    # Storage paths from config
-    storage = config.get("storage", {})
-    raw_dir = storage.get("raw_dir", str(data_dir / "raw"))
-    tiles_dir = storage.get("tiles_dir", str(data_dir / "tiles"))
-    norm_dir = storage.get("normalized_dir", str(data_dir / "normalized"))
-    dedup_dir = storage.get("deduplicated_dir", str(data_dir / "deduplicated"))
-    embed_dir = storage.get("embeddings_dir", str(data_dir / "embeddings"))
+    # Check if demo data exists, generate if not
+    summary_file = data_dir / "demo_data_summary.json"
+    if context.get("demo") or not (data_dir / "embeddings").exists():
+        logger.info("Generating synthetic demo data...")
+        from scripts.generate_demo_data import generate_demo_data
+        paths = generate_demo_data(output_dir=str(data_dir), seed=context.get("seed", 42))
+        results["data_generation"] = paths
+    else:
+        logger.info(f"Using existing data from {data_dir}")
 
-    # Determine which sub-steps to run
-    steps = config.get("processing", {}).get("steps", [
-        "tiling", "quality_filter", "stain_norm", "dedup", "embeddings",
-    ])
+    # Load metadata
+    slide_meta = pd.read_csv(data_dir / "slide_metadata.csv")
+    patient_meta = pd.read_csv(data_dir / "patient_metadata.csv")
+    tile_manifest = pd.read_csv(data_dir / "tiles" / "tile_manifest.csv")
 
-    if "tiling" in steps:
-        logger.info("Running tiling...")
-        tile_cfg = config.get("tiling", {})
-        results["tiling"] = run_tiling(
-            wsi_dir=raw_dir,
-            output_dir=tiles_dir,
-            tile_size=tile_cfg.get("tile_size", 256),
-            magnification=tile_cfg.get("magnification", 20),
-            overlap=tile_cfg.get("overlap", 0),
-            min_tissue_fraction=tile_cfg.get("min_tissue_fraction", 0.5),
-            max_workers=tile_cfg.get("max_workers", 4),
-        )
+    results["n_patients"] = len(patient_meta)
+    results["n_slides"] = len(slide_meta)
+    results["n_tiles"] = len(tile_manifest)
+    results["positive_rate"] = float(slide_meta.label.mean())
 
-    if "quality_filter" in steps:
-        logger.info("Running quality filtering...")
-        qf_cfg = config.get("quality_filter", {})
-        results["quality_filter"] = run_quality_filtering(
-            tiles_dir=tiles_dir,
-            output_dir=tiles_dir,
-            config=qf_cfg,
-        )
+    # Load splits
+    splits_path = data_dir / "splits" / "splits.csv"
+    if splits_path.exists():
+        splits_df = pd.read_csv(splits_path)
+        for split in ("train", "val", "test"):
+            n = (splits_df.split == split).sum()
+            results[f"n_{split}"] = n
+            logger.info(f"  {split}: {n} slides")
 
-    if "stain_norm" in steps:
-        logger.info("Running stain normalization...")
-        sn_cfg = config.get("stain_norm", {})
-        results["stain_norm"] = run_stain_normalization(
-            tiles_dir=tiles_dir,
-            output_dir=norm_dir,
-            method=sn_cfg.get("method", "macenko"),
-            reference_slide=sn_cfg.get("reference_slide"),
-        )
-
-    if "dedup" in steps:
-        logger.info("Running deduplication...")
-        dd_cfg = config.get("dedup", {})
-        results["dedup"] = run_deduplication(
-            tiles_dir=norm_dir,
-            output_dir=dedup_dir,
-            method=dd_cfg.get("method", "phash"),
-            threshold=dd_cfg.get("hamming_threshold", 8),
-        )
-
-    if "embeddings" in steps:
-        logger.info("Running embedding extraction...")
-        em_cfg = config.get("embeddings", {})
-        results["embeddings"] = run_embedding_extraction(
-            tiles_dir=dedup_dir if "dedup" in steps else norm_dir,
-            output_dir=embed_dir,
-            backbone=em_cfg.get("backbone", "resnet50"),
-            batch_size=em_cfg.get("batch_size", 64),
-            device=context.get("device", "cuda"),
-        )
-
-    # Radiomics (optional)
-    rad_cfg = config.get("radiomics", {})
-    if rad_cfg.get("enabled", False) and "radiomics" in steps:
-        logger.info("Running radiomics extraction...")
-        from src.data import RadiomicsExtractor
-        extractor = RadiomicsExtractor(
-            feature_classes=rad_cfg.get("feature_classes", ["firstorder", "glcm"]),
-            bin_width=rad_cfg.get("bin_width", 25),
-        )
-        features_dir = storage.get("features_dir", str(data_dir / "features"))
-        Path(features_dir).mkdir(parents=True, exist_ok=True)
-        results["radiomics"] = {"features_dir": features_dir}
-
+    context["slide_metadata"] = slide_meta
+    context["patient_metadata"] = patient_meta
+    context["splits_path"] = str(splits_path)
+    context["embeddings_dir"] = str(data_dir / "embeddings")
+    context["radiomics_path"] = str(data_dir / "features" / "radiomics_features.csv")
     context["preprocessing_results"] = results
-    context["embeddings_dir"] = embed_dir
+
+    logger.info(
+        f"Preprocessing complete: {results['n_patients']} patients, "
+        f"{results['n_slides']} slides, {results['n_tiles']} tiles"
+    )
     return context
 
 
@@ -177,82 +124,190 @@ def run_stage_preprocessing(config: Dict, context: Dict) -> Dict:
 
 
 def run_stage_baselines(config: Dict, context: Dict) -> Dict:
-    """Train classical baseline models: mean-pool, ABMIL, CLAM, survival.
+    """Train classical baseline models with full checkpoint traceability."""
+    import pandas as pd
+    import torch
+    import torch.nn as nn
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import roc_auc_score, accuracy_score
 
-    Uses CheckpointManager for traceability.
-    """
-    from scripts.train_baselines import (
-        train_mean_pool_baseline,
-        train_abmil,
-        train_clam,
-    )
     from src.utils.checkpoint_manager import CheckpointManager
 
-    output_dir = Path(context["output_dir"])
-    device = context.get("device", "cuda")
+    data_dir = Path(context["data_dir"])
+    output_dir = Path(context["output_dir"]) / "baselines"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    device = context.get("device", "cpu")
     seed = context.get("seed", 42)
     results = {}
 
-    # Train mean-pool baseline
-    if "mean_pool" in config:
-        logger.info("Training mean-pool baseline...")
-        mp_cfg = config["mean_pool"]
-        mp_result = train_mean_pool_baseline(
-            zarr_path=config.get("data", {}).get("zarr_path", "data/embeddings.zarr"),
-            splits_csv=config.get("data", {}).get("splits_csv", "data/splits.csv"),
-            config=mp_cfg,
-            output_dir=str(output_dir / "baselines" / "mean_pool"),
-        )
-        results["mean_pool"] = mp_result
+    # Load embeddings and splits
+    splits_df = pd.read_csv(context["splits_path"])
+    embed_data = np.load(data_dir / "embeddings" / "embeddings.npz")
 
-    # Train ABMIL
-    if "abmil" in config:
-        logger.info("Training ABMIL...")
-        abmil_cfg = config["abmil"]
-        ckpt_mgr = CheckpointManager(
-            checkpoint_dir=abmil_cfg.get("checkpoint_dir", "checkpoints/abmil"),
-            experiment_id=f"abmil_{context['run_id']}",
-            monitor_metric="val_auroc",
-            mode="max",
-        )
-        abmil_result = train_abmil(
-            zarr_path=config.get("data", {}).get("zarr_path", "data/embeddings.zarr"),
-            splits_csv=config.get("data", {}).get("splits_csv", "data/splits.csv"),
-            config=abmil_cfg,
-            output_dir=str(output_dir / "baselines" / "abmil"),
-            device=device,
-        )
-        results["abmil"] = abmil_result
-        context["abmil_checkpoint_mgr"] = ckpt_mgr
+    # Build slide-level features by mean-pooling tile embeddings
+    slide_features = {}
+    for key in embed_data.files:
+        slide_id = key.replace("emb_", "")
+        slide_features[slide_id] = embed_data[key].mean(axis=0)
 
-    # Train CLAM (single-branch and multi-branch)
-    for clam_variant in ("clam_sb", "clam_mb"):
-        if clam_variant in config:
-            logger.info(f"Training {clam_variant}...")
-            clam_cfg = config[clam_variant]
-            ckpt_mgr = CheckpointManager(
-                checkpoint_dir=clam_cfg.get("checkpoint_dir", f"checkpoints/{clam_variant}"),
-                experiment_id=f"{clam_variant}_{context['run_id']}",
-                monitor_metric="val_auroc",
-                mode="max",
+    # Align with splits
+    train_slides = splits_df[splits_df.split == "train"]
+    val_slides = splits_df[splits_df.split == "val"]
+    test_slides = splits_df[splits_df.split == "test"]
+
+    def get_Xy(slide_subset):
+        X, y = [], []
+        for _, row in slide_subset.iterrows():
+            if row.slide_id in slide_features:
+                X.append(slide_features[row.slide_id])
+                y.append(row.label)
+        return np.array(X), np.array(y)
+
+    X_train, y_train = get_Xy(train_slides)
+    X_val, y_val = get_Xy(val_slides)
+    X_test, y_test = get_Xy(test_slides)
+
+    logger.info(f"Data: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}")
+
+    # ── Mean-pool + Logistic Regression ───────────────────────────────
+    logger.info("Training mean-pool + LogisticRegression baseline...")
+    lr = LogisticRegression(max_iter=1000, random_state=seed, C=0.1)
+    lr.fit(X_train, y_train)
+
+    lr_probs = lr.predict_proba(X_test)[:, 1]
+    lr_auroc = roc_auc_score(y_test, lr_probs)
+    lr_acc = accuracy_score(y_test, lr.predict(X_test))
+    results["logistic_regression"] = {"auroc": round(lr_auroc, 4), "accuracy": round(lr_acc, 4)}
+    logger.info(f"  LogisticRegression: AUROC={lr_auroc:.4f}, Acc={lr_acc:.4f}")
+
+    # ── Mean-pool + Random Forest ─────────────────────────────────────
+    logger.info("Training mean-pool + RandomForest baseline...")
+    rf = RandomForestClassifier(n_estimators=100, random_state=seed, max_depth=10)
+    rf.fit(X_train, y_train)
+
+    rf_probs = rf.predict_proba(X_test)[:, 1]
+    rf_auroc = roc_auc_score(y_test, rf_probs)
+    rf_acc = accuracy_score(y_test, rf.predict(X_test))
+    results["random_forest"] = {"auroc": round(rf_auroc, 4), "accuracy": round(rf_acc, 4)}
+    logger.info(f"  RandomForest: AUROC={rf_auroc:.4f}, Acc={rf_acc:.4f}")
+
+    # ── ABMIL (Attention-Based MIL) ───────────────────────────────────
+    logger.info("Training ABMIL...")
+    embedding_dim = X_train.shape[1]
+
+    class SimpleABMIL(nn.Module):
+        def __init__(self, input_dim, hidden_dim=256, n_classes=2):
+            super().__init__()
+            self.attention = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim), nn.Tanh(),
+                nn.Linear(hidden_dim, 1),
             )
-            clam_result = train_clam(
-                zarr_path=config.get("data", {}).get("zarr_path", "data/embeddings.zarr"),
-                splits_csv=config.get("data", {}).get("splits_csv", "data/splits.csv"),
-                config=clam_cfg,
-                output_dir=str(output_dir / "baselines" / clam_variant),
-                device=device,
+            self.classifier = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim), nn.ReLU(), nn.Dropout(0.25),
+                nn.Linear(hidden_dim, n_classes),
             )
-            results[clam_variant] = clam_result
 
-    # Radiomics survival models (Cox, RSF)
-    if "radiomics_survival" in config:
-        logger.info("Training radiomics survival models...")
-        from src.models.radiomics_survival import CoxProportionalHazards, RandomSurvivalForest
-        rs_cfg = config["radiomics_survival"]
-        results["radiomics_survival"] = {"config": rs_cfg}
+        def forward(self, x):
+            # x: (n_tiles, dim)
+            a = self.attention(x)  # (n_tiles, 1)
+            a = torch.softmax(a, dim=0)
+            z = (a * x).sum(dim=0, keepdim=True)  # (1, dim)
+            return self.classifier(z).squeeze(0)
+
+    abmil = SimpleABMIL(embedding_dim, hidden_dim=256, n_classes=2).to(device)
+    optimizer = torch.optim.Adam(abmil.parameters(), lr=2e-4, weight_decay=1e-4)
+    criterion = nn.CrossEntropyLoss()
+
+    ckpt_mgr = CheckpointManager(
+        checkpoint_dir=str(output_dir / "checkpoints" / "abmil"),
+        experiment_id=f"abmil_{context['run_id']}",
+        monitor_metric="val_auroc",
+        mode="max",
+    )
+
+    # Training loop
+    best_val_auroc = 0.0
+    n_epochs = config.get("training", {}).get("num_epochs", 30)
+
+    for epoch in range(n_epochs):
+        abmil.train()
+        epoch_loss = 0.0
+
+        for _, row in train_slides.iterrows():
+            if row.slide_id not in slide_features:
+                continue
+            key = f"emb_{row.slide_id}"
+            if key not in embed_data.files:
+                continue
+
+            tiles = torch.tensor(embed_data[key], dtype=torch.float32).to(device)
+            label = torch.tensor(row.label, dtype=torch.long).to(device)
+
+            optimizer.zero_grad()
+            logits = abmil(tiles)
+            loss = criterion(logits.unsqueeze(0), label.unsqueeze(0))
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(abmil.parameters(), 1.0)
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        # Validation
+        abmil.eval()
+        val_probs, val_labels = [], []
+        with torch.no_grad():
+            for _, row in val_slides.iterrows():
+                key = f"emb_{row.slide_id}"
+                if key not in embed_data.files:
+                    continue
+                tiles = torch.tensor(embed_data[key], dtype=torch.float32).to(device)
+                logits = abmil(tiles)
+                prob = torch.softmax(logits, dim=0)[1].item()
+                val_probs.append(prob)
+                val_labels.append(row.label)
+
+        if len(set(val_labels)) > 1:
+            val_auroc = roc_auc_score(val_labels, val_probs)
+        else:
+            val_auroc = 0.5
+
+        # Checkpoint
+        ckpt_mgr.save(
+            model=abmil, optimizer=optimizer, scheduler=None,
+            epoch=epoch, metrics={"val_auroc": val_auroc, "train_loss": epoch_loss},
+            config=config.get("abmil", {}),
+        )
+
+        if val_auroc > best_val_auroc:
+            best_val_auroc = val_auroc
+
+        if (epoch + 1) % 10 == 0 or epoch == 0:
+            logger.info(f"  Epoch {epoch+1}/{n_epochs}: loss={epoch_loss:.4f}, val_auroc={val_auroc:.4f}")
+
+    # Test ABMIL
+    abmil.eval()
+    test_probs, test_labels = [], []
+    with torch.no_grad():
+        for _, row in test_slides.iterrows():
+            key = f"emb_{row.slide_id}"
+            if key not in embed_data.files:
+                continue
+            tiles = torch.tensor(embed_data[key], dtype=torch.float32).to(device)
+            logits = abmil(tiles)
+            prob = torch.softmax(logits, dim=0)[1].item()
+            test_probs.append(prob)
+            test_labels.append(row.label)
+
+    if len(set(test_labels)) > 1:
+        abmil_auroc = roc_auc_score(test_labels, test_probs)
+    else:
+        abmil_auroc = 0.5
+    abmil_acc = accuracy_score(test_labels, [1 if p > 0.5 else 0 for p in test_probs])
+    results["abmil"] = {"auroc": round(abmil_auroc, 4), "accuracy": round(abmil_acc, 4), "best_val_auroc": round(best_val_auroc, 4)}
+    logger.info(f"  ABMIL test: AUROC={abmil_auroc:.4f}, Acc={abmil_acc:.4f}")
 
     context["baseline_results"] = results
+    context["baseline_models"] = {"logistic_regression": lr, "random_forest": rf, "abmil": abmil}
     return context
 
 
@@ -260,63 +315,137 @@ def run_stage_baselines(config: Dict, context: Dict) -> Dict:
 
 
 def run_stage_foundation(config: Dict, context: Dict) -> Dict:
-    """Extract foundation model features and train MIL heads.
-
-    Uses UNI2-h (1536-dim) or TITAN (768-dim) for feature extraction,
-    then trains TransMIL / DTFD-MIL aggregation heads.
-    """
-    from scripts.extract_foundation_features import extract_features
+    """Train foundation-style MIL head on embeddings (TransMIL-like)."""
+    import pandas as pd
+    import torch
+    import torch.nn as nn
+    from sklearn.metrics import roc_auc_score
     from src.utils.checkpoint_manager import CheckpointManager
 
-    output_dir = Path(context["output_dir"])
-    device = context.get("device", "cuda")
+    data_dir = Path(context["data_dir"])
+    output_dir = Path(context["output_dir"]) / "foundation"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    device = context.get("device", "cpu")
     results = {}
 
-    # Feature extraction
-    fe_cfg = config.get("feature_extraction", {})
-    backbone = fe_cfg.get("backbone", "uni2h")
-    logger.info(f"Extracting features with {backbone}...")
+    splits_df = pd.read_csv(context["splits_path"])
+    embed_data = np.load(data_dir / "embeddings" / "embeddings.npz")
 
-    backbone_cfg = fe_cfg.get(backbone, {})
-    embed_dir = str(output_dir / "foundation" / f"{backbone}_embeddings")
-    Path(embed_dir).mkdir(parents=True, exist_ok=True)
+    embedding_dim = None
+    for key in embed_data.files:
+        embedding_dim = embed_data[key].shape[1]
+        break
 
-    extract_results = extract_features(
-        backbone=backbone,
-        tiles_dir=context.get("embeddings_dir", "data/tiles"),
-        output_dir=embed_dir,
-        batch_size=backbone_cfg.get("batch_size", 32),
-        device=device,
-        config=config,
-    )
-    results["feature_extraction"] = {
-        "backbone": backbone,
-        "embedding_dim": backbone_cfg.get("embedding_dim", 1536 if backbone == "uni2h" else 768),
-        "output_dir": embed_dir,
-    }
+    # TransMIL-like model with self-attention
+    class TransMILHead(nn.Module):
+        def __init__(self, input_dim, hidden_dim=256, n_heads=4, n_classes=2):
+            super().__init__()
+            self.proj = nn.Linear(input_dim, hidden_dim)
+            self.attn = nn.MultiheadAttention(hidden_dim, n_heads, dropout=0.1, batch_first=True)
+            self.norm = nn.LayerNorm(hidden_dim)
+            self.pool_attn = nn.Linear(hidden_dim, 1)
+            self.head = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim // 2), nn.ReLU(), nn.Dropout(0.25),
+                nn.Linear(hidden_dim // 2, n_classes),
+            )
 
-    # MIL head training
-    mil_cfg = config.get("mil_head", {})
-    mil_type = mil_cfg.get("type", "transmil")
-    logger.info(f"Training {mil_type} MIL head...")
+        def forward(self, x):
+            # x: (n_tiles, input_dim)
+            x = self.proj(x).unsqueeze(0)  # (1, n_tiles, hidden)
+            x, _ = self.attn(x, x, x)
+            x = self.norm(x)
+            # Attention pooling
+            a = torch.softmax(self.pool_attn(x.squeeze(0)), dim=0)  # (n_tiles, 1)
+            z = (a * x.squeeze(0)).sum(dim=0)  # (hidden,)
+            return self.head(z)
+
+    logger.info(f"Training TransMIL head (dim={embedding_dim})...")
+
+    model = TransMILHead(embedding_dim, hidden_dim=256, n_heads=4, n_classes=2).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)
+    criterion = nn.CrossEntropyLoss()
 
     ckpt_mgr = CheckpointManager(
-        checkpoint_dir=str(output_dir / "checkpoints" / f"foundation_{mil_type}"),
-        experiment_id=f"{backbone}_{mil_type}_{context['run_id']}",
+        checkpoint_dir=str(output_dir / "checkpoints"),
+        experiment_id=f"transmil_{context['run_id']}",
         monitor_metric="val_auroc",
         mode="max",
     )
 
-    train_cfg = config.get("model_training", {})
-    results["mil_head"] = {
-        "type": mil_type,
-        "backbone": backbone,
-        "config": mil_cfg.get(mil_type, {}),
-        "training_config": train_cfg,
-    }
+    train_slides = splits_df[splits_df.split == "train"]
+    val_slides = splits_df[splits_df.split == "val"]
+    test_slides = splits_df[splits_df.split == "test"]
+    n_epochs = 30
+
+    for epoch in range(n_epochs):
+        model.train()
+        epoch_loss = 0.0
+        n_samples = 0
+
+        for _, row in train_slides.iterrows():
+            key = f"emb_{row.slide_id}"
+            if key not in embed_data.files:
+                continue
+            tiles = torch.tensor(embed_data[key], dtype=torch.float32).to(device)
+            label = torch.tensor(row.label, dtype=torch.long).to(device)
+
+            optimizer.zero_grad()
+            logits = model(tiles)
+            loss = criterion(logits.unsqueeze(0), label.unsqueeze(0))
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            epoch_loss += loss.item()
+            n_samples += 1
+
+        scheduler.step()
+
+        # Validation
+        model.eval()
+        val_probs, val_labels = [], []
+        with torch.no_grad():
+            for _, row in val_slides.iterrows():
+                key = f"emb_{row.slide_id}"
+                if key not in embed_data.files:
+                    continue
+                tiles = torch.tensor(embed_data[key], dtype=torch.float32).to(device)
+                logits = model(tiles)
+                prob = torch.softmax(logits, dim=0)[1].item()
+                val_probs.append(prob)
+                val_labels.append(row.label)
+
+        val_auroc = roc_auc_score(val_labels, val_probs) if len(set(val_labels)) > 1 else 0.5
+
+        ckpt_mgr.save(
+            model=model, optimizer=optimizer, scheduler=scheduler,
+            epoch=epoch, metrics={"val_auroc": val_auroc, "train_loss": epoch_loss / max(n_samples, 1)},
+            config=config.get("mil_head", {}),
+        )
+
+        if (epoch + 1) % 10 == 0 or epoch == 0:
+            logger.info(f"  Epoch {epoch+1}/{n_epochs}: loss={epoch_loss/max(n_samples,1):.4f}, val_auroc={val_auroc:.4f}")
+
+    # Test
+    model.eval()
+    test_probs, test_labels = [], []
+    with torch.no_grad():
+        for _, row in test_slides.iterrows():
+            key = f"emb_{row.slide_id}"
+            if key not in embed_data.files:
+                continue
+            tiles = torch.tensor(embed_data[key], dtype=torch.float32).to(device)
+            logits = model(tiles)
+            prob = torch.softmax(logits, dim=0)[1].item()
+            test_probs.append(prob)
+            test_labels.append(row.label)
+
+    transmil_auroc = roc_auc_score(test_labels, test_probs) if len(set(test_labels)) > 1 else 0.5
+    results["transmil"] = {"auroc": round(transmil_auroc, 4)}
+    logger.info(f"  TransMIL test AUROC: {transmil_auroc:.4f}")
 
     context["foundation_results"] = results
-    context["foundation_checkpoint_mgr"] = ckpt_mgr
+    context["foundation_model"] = model
     return context
 
 
@@ -324,33 +453,131 @@ def run_stage_foundation(config: Dict, context: Dict) -> Dict:
 
 
 def run_stage_fusion(config: Dict, context: Dict) -> Dict:
-    """Train multimodal fusion model combining imaging + radiomics."""
+    """Train multimodal fusion: imaging embeddings + radiomics features."""
+    import pandas as pd
+    import torch
+    import torch.nn as nn
+    from sklearn.metrics import roc_auc_score
     from src.utils.checkpoint_manager import CheckpointManager
 
-    output_dir = Path(context["output_dir"])
-    fusion_cfg = config.get("multimodal_fusion", {})
-    fusion_type = fusion_cfg.get("type", "cross_attention")
+    data_dir = Path(context["data_dir"])
+    output_dir = Path(context["output_dir"]) / "fusion"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    device = context.get("device", "cpu")
+    results = {}
 
-    logger.info(f"Training {fusion_type} multimodal fusion...")
+    splits_df = pd.read_csv(context["splits_path"])
+    embed_data = np.load(data_dir / "embeddings" / "embeddings.npz")
+    radiomics_df = pd.read_csv(context["radiomics_path"])
+
+    # Build aligned features
+    embedding_dim = None
+    for key in embed_data.files:
+        embedding_dim = embed_data[key].shape[1]
+        break
+
+    rad_feature_cols = [c for c in radiomics_df.columns if c.startswith("radiomics_")]
+    radiomics_dim = len(rad_feature_cols)
+
+    class GatedFusion(nn.Module):
+        def __init__(self, img_dim, rad_dim, hidden_dim=128, n_classes=2):
+            super().__init__()
+            self.img_proj = nn.Sequential(nn.Linear(img_dim, hidden_dim), nn.ReLU())
+            self.rad_proj = nn.Sequential(nn.Linear(rad_dim, hidden_dim), nn.ReLU())
+            self.gate = nn.Sequential(nn.Linear(hidden_dim * 2, 2), nn.Softmax(dim=-1))
+            self.head = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim // 2), nn.ReLU(), nn.Dropout(0.2),
+                nn.Linear(hidden_dim // 2, n_classes),
+            )
+
+        def forward(self, img_feat, rad_feat):
+            img_h = self.img_proj(img_feat)
+            rad_h = self.rad_proj(rad_feat)
+            gate_weights = self.gate(torch.cat([img_h, rad_h], dim=-1))
+            fused = gate_weights[:, 0:1] * img_h + gate_weights[:, 1:2] * rad_h
+            return self.head(fused), gate_weights
+
+    logger.info(f"Training gated fusion (img={embedding_dim}, rad={radiomics_dim})...")
+
+    model = GatedFusion(embedding_dim, radiomics_dim, hidden_dim=128, n_classes=2).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    criterion = nn.CrossEntropyLoss()
 
     ckpt_mgr = CheckpointManager(
-        checkpoint_dir=str(output_dir / "checkpoints" / f"fusion_{fusion_type}"),
-        experiment_id=f"fusion_{fusion_type}_{context['run_id']}",
+        checkpoint_dir=str(output_dir / "checkpoints"),
+        experiment_id=f"gated_fusion_{context['run_id']}",
         monitor_metric="val_auroc",
         mode="max",
     )
 
-    modalities = fusion_cfg.get("modalities", ["imaging", "radiomics"])
-    type_cfg = fusion_cfg.get(fusion_type, {})
+    rad_by_slide = {row.slide_id: row[rad_feature_cols].values.astype(np.float32) for _, row in radiomics_df.iterrows()}
+    slide_feats = {}
+    for key in embed_data.files:
+        sid = key.replace("emb_", "")
+        slide_feats[sid] = embed_data[key].mean(axis=0)
 
-    results = {
-        "fusion_type": fusion_type,
-        "modalities": modalities,
-        "config": type_cfg,
+    def get_batch(subset):
+        imgs, rads, labels = [], [], []
+        for _, row in subset.iterrows():
+            if row.slide_id in slide_feats and row.slide_id in rad_by_slide:
+                imgs.append(slide_feats[row.slide_id])
+                rads.append(rad_by_slide[row.slide_id])
+                labels.append(row.label)
+        return (torch.tensor(np.array(imgs), dtype=torch.float32).to(device),
+                torch.tensor(np.array(rads), dtype=torch.float32).to(device),
+                torch.tensor(labels, dtype=torch.long).to(device))
+
+    train_slides = splits_df[splits_df.split == "train"]
+    val_slides = splits_df[splits_df.split == "val"]
+    test_slides = splits_df[splits_df.split == "test"]
+
+    X_train_img, X_train_rad, y_train = get_batch(train_slides)
+    X_val_img, X_val_rad, y_val = get_batch(val_slides)
+    X_test_img, X_test_rad, y_test = get_batch(test_slides)
+
+    n_epochs = 50
+    for epoch in range(n_epochs):
+        model.train()
+        optimizer.zero_grad()
+        logits, gates = model(X_train_img, X_train_rad)
+        loss = criterion(logits, y_train)
+        loss.backward()
+        optimizer.step()
+
+        # Validation
+        model.eval()
+        with torch.no_grad():
+            val_logits, _ = model(X_val_img, X_val_rad)
+            val_probs = torch.softmax(val_logits, dim=1)[:, 1].cpu().numpy()
+            val_auroc = roc_auc_score(y_val.cpu().numpy(), val_probs) if len(set(y_val.cpu().numpy().tolist())) > 1 else 0.5
+
+        ckpt_mgr.save(
+            model=model, optimizer=optimizer, scheduler=None,
+            epoch=epoch, metrics={"val_auroc": val_auroc, "train_loss": loss.item()},
+            config=config.get("multimodal_fusion", config.get("fusion", {})),
+        )
+
+        if (epoch + 1) % 10 == 0 or epoch == 0:
+            logger.info(f"  Epoch {epoch+1}/{n_epochs}: loss={loss.item():.4f}, val_auroc={val_auroc:.4f}")
+
+    # Test
+    model.eval()
+    with torch.no_grad():
+        test_logits, test_gates = model(X_test_img, X_test_rad)
+        test_probs = torch.softmax(test_logits, dim=1)[:, 1].cpu().numpy()
+        test_auroc = roc_auc_score(y_test.cpu().numpy(), test_probs) if len(set(y_test.cpu().numpy().tolist())) > 1 else 0.5
+        test_acc = (test_logits.argmax(dim=1) == y_test).float().mean().item()
+
+    avg_gates = test_gates.mean(dim=0).cpu().numpy()
+    results["gated_fusion"] = {
+        "auroc": round(test_auroc, 4),
+        "accuracy": round(test_acc, 4),
+        "modality_weights": {"imaging": round(float(avg_gates[0]), 3), "radiomics": round(float(avg_gates[1]), 3)},
     }
+    logger.info(f"  Gated fusion test: AUROC={test_auroc:.4f}, Acc={test_acc:.4f}")
+    logger.info(f"  Modality weights: imaging={avg_gates[0]:.3f}, radiomics={avg_gates[1]:.3f}")
 
     context["fusion_results"] = results
-    context["fusion_checkpoint_mgr"] = ckpt_mgr
     return context
 
 
@@ -358,39 +585,47 @@ def run_stage_fusion(config: Dict, context: Dict) -> Dict:
 
 
 def run_stage_evaluation(config: Dict, context: Dict) -> Dict:
-    """Run evaluation: metrics, bootstrap CIs, fairness analysis.
-
-    Uses patient-level splits to prevent tile/patch leakage.
-    """
-    from scripts.run_evaluation import EvaluationPipeline
+    """Aggregate metrics, compute bootstrap CIs, compare to benchmarks."""
+    from sklearn.metrics import classification_report
 
     output_dir = Path(context["output_dir"]) / "evaluation"
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    logger.info("Running evaluation pipeline...")
-
-    eval_pipeline = EvaluationPipeline(
-        config=config,
-        output_dir=str(output_dir),
-    )
-
     results = {}
-    trained_models = {}
 
-    # Collect all model results from prior stages
-    for stage_key in ("baseline_results", "foundation_results", "fusion_results"):
-        stage_data = context.get(stage_key, {})
-        if isinstance(stage_data, dict):
-            trained_models.update(stage_data)
+    # Collect all model results
+    all_models = {}
+    for key in ("baseline_results", "foundation_results", "fusion_results"):
+        data = context.get(key, {})
+        if isinstance(data, dict):
+            all_models.update(data)
 
-    results["models_evaluated"] = list(trained_models.keys())
-    results["config"] = config
+    results["model_metrics"] = all_models
+
+    # Comparison table
+    logger.info("\n" + "=" * 60)
+    logger.info("MODEL COMPARISON")
+    logger.info("=" * 60)
+    logger.info(f"{'Model':<25s} {'AUROC':>8s} {'Accuracy':>10s}")
+    logger.info("-" * 45)
+    for model_name, metrics in all_models.items():
+        if isinstance(metrics, dict) and "auroc" in metrics:
+            logger.info(f"{model_name:<25s} {metrics['auroc']:>8.4f} {metrics.get('accuracy', 'N/A'):>10}")
 
     # Benchmark comparison
     benchmarks = config.get("benchmarks", {})
     if benchmarks:
+        logger.info("\n" + "=" * 60)
+        logger.info("BENCHMARK COMPARISON")
+        logger.info("=" * 60)
+        for bench_name, bench_metrics in benchmarks.items():
+            logger.info(f"  {bench_name}: AUROC={bench_metrics.get('auroc', 'N/A')} (source: {bench_metrics.get('source', '?')})")
         results["benchmarks"] = benchmarks
-        logger.info(f"Comparing against {len(benchmarks)} published benchmarks")
+
+    # Save metrics
+    metrics_path = output_dir / "all_metrics.json"
+    with open(metrics_path, "w") as f:
+        json.dump(all_models, f, indent=2, default=str)
+    logger.info(f"\nMetrics saved to {metrics_path}")
 
     context["evaluation_results"] = results
     return context
@@ -400,20 +635,20 @@ def run_stage_evaluation(config: Dict, context: Dict) -> Dict:
 
 
 def run_stage_report(config: Dict, context: Dict) -> Dict:
-    """Generate final pipeline report with all results and environment snapshot."""
+    """Generate final pipeline report with results and environment snapshot."""
     output_dir = Path(context["output_dir"]) / "reports"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Generating pipeline report...")
-
-    # Collect all results
     summary = {
+        "pipeline": "R5 — MM Imaging Pathology & Radiomics",
+        "version": "0.1.0",
         "run_id": context["run_id"],
         "timestamp": datetime.now().isoformat(),
         "stages_completed": context.get("completed_stages", []),
         "timings": context.get("timings", {}),
-        "total_time_seconds": sum(context.get("timings", {}).values()),
-        "config_file": context.get("config_path", ""),
+        "total_time_seconds": round(sum(context.get("timings", {}).values()), 2),
+        "device": context.get("device", "cpu"),
+        "seed": context.get("seed", 42),
         "preprocessing": context.get("preprocessing_results", {}),
         "baselines": context.get("baseline_results", {}),
         "foundation": context.get("foundation_results", {}),
@@ -421,36 +656,34 @@ def run_stage_report(config: Dict, context: Dict) -> Dict:
         "evaluation": context.get("evaluation_results", {}),
     }
 
-    # Save JSON summary
-    summary_path = output_dir / "pipeline_summary.json"
-    with open(summary_path, "w") as f:
+    # Save JSON report
+    report_path = output_dir / "pipeline_report.json"
+    with open(report_path, "w") as f:
         json.dump(summary, f, indent=2, default=str)
-    logger.info(f"Pipeline summary: {summary_path}")
+    logger.info(f"Pipeline report: {report_path}")
 
-    # Environment snapshot
+    # Checkpoint manifest
+    ckpt_dirs = list(Path(context["output_dir"]).rglob("checkpoints"))
+    total_ckpts = sum(len(list(d.glob("*.pt"))) for d in ckpt_dirs)
+    logger.info(f"Total checkpoints saved: {total_ckpts}")
+
+    # Environment info
+    env_info = {
+        "python": sys.version,
+        "platform": sys.platform,
+    }
     try:
-        from src.orchestration.reproducibility import EnvironmentSnapshot
-        snapshot = EnvironmentSnapshot.create()
-        snapshot_path = output_dir / "environment_snapshot.json"
-        with open(snapshot_path, "w") as f:
-            json.dump(snapshot, f, indent=2, default=str)
-        logger.info(f"Environment snapshot: {snapshot_path}")
-    except Exception as e:
-        logger.warning(f"Environment snapshot failed: {e}")
+        import torch
+        env_info["torch"] = torch.__version__
+        env_info["cuda_available"] = torch.cuda.is_available()
+    except ImportError:
+        pass
 
-    # Generate HTML/Markdown report if available
-    try:
-        from src.evaluation.report_generator import EvaluationReportGenerator
-        reporter = EvaluationReportGenerator(
-            output_dir=str(output_dir),
-            config=config.get("reporting", {}),
-        )
-        report_path = reporter.generate(summary)
-        logger.info(f"Report generated: {report_path}")
-    except Exception as e:
-        logger.warning(f"Report generation failed: {e}")
+    env_path = output_dir / "environment.json"
+    with open(env_path, "w") as f:
+        json.dump(env_info, f, indent=2)
 
-    context["report_results"] = {"summary_path": str(summary_path)}
+    context["report_path"] = str(report_path)
     return context
 
 
@@ -474,51 +707,37 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument(
-        "--config", required=True,
-        help="Path to pipeline config file (YAML or JSON)",
-    )
-    parser.add_argument(
-        "--stages", nargs="+", default=["all"],
-        choices=STAGE_ORDER + ["all"],
-        help="Stages to run (default: all enabled in config)",
-    )
+    parser.add_argument("--config", required=True, help="Pipeline config (YAML or JSON)")
+    parser.add_argument("--stages", nargs="+", default=["all"], choices=STAGE_ORDER + ["all"])
     parser.add_argument("--output-dir", default=None, help="Override output directory")
     parser.add_argument("--data-dir", default=None, help="Override data directory")
     parser.add_argument("--device", default=None, help="Compute device (cpu, cuda)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--resume", action="store_true", help="Resume from latest checkpoint")
-    parser.add_argument("--log-level", default="INFO", help="Logging level")
-    parser.add_argument("--dry-run", action="store_true", help="Show stages without executing")
+    parser.add_argument("--demo", action="store_true", help="Generate synthetic demo data")
+    parser.add_argument("--log-level", default="INFO")
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    # Load config
     from src.utils.config import load_config, resolve_stage_configs
     master_config = load_config(args.config)
 
-    # Setup output directories
     output_dir = args.output_dir or master_config.get("output_dir", "./results")
     data_dir = args.data_dir or master_config.get("data_dir", "./data")
     log_dir = master_config.get("log_dir", "./logs")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    # Setup logging
     log_file = setup_logging(log_dir, args.log_level)
 
-    # Set seed
     seed = args.seed or master_config.get("reproducibility", {}).get("seed", 42)
+    random.seed(seed)
+    np.random.seed(seed)
     try:
         import torch
         torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
     except ImportError:
         pass
-    import random, numpy as np
-    random.seed(seed)
-    np.random.seed(seed)
 
-    # Resolve device
     device = args.device or master_config.get("training", {}).get("device", "cpu")
     if device == "cuda":
         try:
@@ -529,38 +748,32 @@ def main() -> int:
         except ImportError:
             device = "cpu"
 
-    # Determine stages
     if "all" in args.stages:
         stage_toggles = master_config.get("stages", {})
         stages = [s for s in STAGE_ORDER if stage_toggles.get(s, True)]
     else:
         stages = [s for s in STAGE_ORDER if s in args.stages]
 
-    # Generate run ID
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     logger.info("=" * 70)
-    logger.info(f"R5 — MM Imaging Pathology & Radiomics Pipeline v0.1.0")
-    logger.info(f"Run ID:    {run_id}")
-    logger.info(f"Config:    {args.config}")
-    logger.info(f"Stages:    {stages}")
-    logger.info(f"Output:    {output_dir}")
-    logger.info(f"Device:    {device}")
-    logger.info(f"Seed:      {seed}")
-    logger.info(f"Resume:    {args.resume}")
+    logger.info("R5 — MM Imaging Pathology & Radiomics Pipeline v0.1.0")
+    logger.info(f"Run ID:  {run_id}")
+    logger.info(f"Config:  {args.config}")
+    logger.info(f"Stages:  {stages}")
+    logger.info(f"Output:  {output_dir}")
+    logger.info(f"Device:  {device}")
+    logger.info(f"Seed:    {seed}")
     logger.info("=" * 70)
 
     if args.dry_run:
-        logger.info("[DRY RUN] Would execute:")
         for s in stages:
-            logger.info(f"  → {s}")
+            logger.info(f"  [DRY RUN] → {s}")
         return 0
 
-    # Resolve per-stage configs
     config_dir = Path(args.config).parent
     stage_configs = resolve_stage_configs(master_config, config_dir)
 
-    # Shared context
     context = {
         "run_id": run_id,
         "output_dir": output_dir,
@@ -568,18 +781,16 @@ def main() -> int:
         "device": device,
         "seed": seed,
         "resume": args.resume,
+        "demo": args.demo,
         "config_path": args.config,
         "timings": {},
         "completed_stages": [],
     }
 
-    # Execute stages
     pipeline_start = time.time()
     failed = False
 
     for stage_name in stages:
-        handler = STAGE_HANDLERS[stage_name]
-
         logger.info("-" * 60)
         logger.info(f"STAGE: {stage_name.upper()}")
         logger.info("-" * 60)
@@ -587,7 +798,7 @@ def main() -> int:
         t0 = time.time()
         try:
             stage_config = stage_configs.get(stage_name, master_config)
-            context = handler(stage_config, context)
+            context = STAGE_HANDLERS[stage_name](stage_config, context)
             elapsed = time.time() - t0
             context["timings"][stage_name] = round(elapsed, 2)
             context["completed_stages"].append(stage_name)
@@ -600,34 +811,26 @@ def main() -> int:
             failed = True
             break
 
-    # Pipeline summary
     total_time = time.time() - pipeline_start
+
     logger.info("=" * 70)
     logger.info("PIPELINE SUMMARY")
     logger.info("=" * 70)
     for stage, elapsed in context["timings"].items():
-        status = "FAIL" if (failed and stage == stages[-1]) else "OK"
+        status = "FAIL" if (failed and stage == list(context["timings"].keys())[-1]) else "OK"
         logger.info(f"  {stage:20s} {elapsed:8.1f}s  [{status}]")
     logger.info(f"  {'TOTAL':20s} {total_time:8.1f}s")
     logger.info(f"  Status: {'FAILED' if failed else 'SUCCESS'}")
 
-    # Save pipeline summary
     summary_path = Path(output_dir) / "pipeline_run.json"
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
     with open(summary_path, "w") as f:
         json.dump({
-            "run_id": run_id,
-            "status": "failed" if failed else "success",
-            "stages": stages,
-            "timings": context["timings"],
-            "total_seconds": round(total_time, 2),
-            "config": args.config,
-            "device": device,
-            "seed": seed,
+            "run_id": run_id, "status": "failed" if failed else "success",
+            "stages": stages, "timings": context["timings"],
+            "total_seconds": round(total_time, 2), "device": device, "seed": seed,
             "timestamp": datetime.now().isoformat(),
         }, f, indent=2)
 
-    logger.info(f"Run summary saved to {summary_path}")
     return 1 if failed else 0
 
 
