@@ -281,13 +281,15 @@ class DTFDMIL(nn.Module):
         """
         B, N, D = embeddings.shape
 
-        # Project features
+        # Project features and L2-normalize for cosine similarity
         x = self.feature_projection(embeddings)  # (B, N, hidden_dim)
+        x = F.layer_norm(x, [self.hidden_dim])
 
-        # Assign instances to pseudo-bags via soft assignment
-        pseudo_centers = self.pseudo_bag_centers  # (K, hidden_dim)
-        # Compute similarity to each pseudo-bag center
-        similarities = torch.einsum("bnh,kh->bnk", x, pseudo_centers)  # (B, N, K)
+        # Assign instances to pseudo-bags via soft cosine similarity
+        pseudo_centers = F.normalize(self.pseudo_bag_centers, dim=1)  # (K, hidden_dim)
+        x_norm = F.normalize(x, dim=2)  # (B, N, hidden_dim)
+        # Cosine similarity to each pseudo-bag center
+        similarities = torch.einsum("bnh,kh->bnk", x_norm, pseudo_centers)  # (B, N, K)
         assignments = F.softmax(similarities, dim=2)  # (B, N, K)
 
         # Tier 1: Aggregate within each pseudo-bag

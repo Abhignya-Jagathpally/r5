@@ -25,6 +25,35 @@ from sklearn.preprocessing import label_binarize
 logger = logging.getLogger(__name__)
 
 
+def stratified_bootstrap_indices(
+    rng: np.random.RandomState,
+    y: np.ndarray,
+    n_samples: int,
+) -> np.ndarray:
+    """Generate bootstrap indices that preserve class proportions.
+
+    Resamples within each class independently, ensuring every bootstrap
+    sample has the same class balance as the original data. This prevents
+    degenerate bootstraps where a minority class is absent.
+
+    Args:
+        rng: Random state for reproducibility.
+        y: Class labels array.
+        n_samples: Total number of indices to return.
+
+    Returns:
+        Array of resampled indices.
+    """
+    classes, counts = np.unique(y, return_counts=True)
+    fractions = counts / counts.sum()
+    indices = []
+    for cls, frac in zip(classes, fractions):
+        cls_idx = np.where(y == cls)[0]
+        n_cls = max(1, int(round(frac * n_samples)))
+        indices.extend(rng.choice(cls_idx, size=n_cls, replace=True).tolist())
+    return np.array(indices[:n_samples])
+
+
 @dataclass
 class MetricResult:
     """Container for a metric value with confidence interval."""
@@ -160,13 +189,13 @@ class ClassificationMetrics:
         else:
             main_auroc = roc_auc_score(y_true, y_pred_proba, average=average)
 
-        # Bootstrap CI (patient-level if patient_ids provided)
+        # Bootstrap CI (patient-level > stratified > simple)
         bootstrap_aurocs = []
         for _ in range(self.bootstrap_iterations):
             if patient_ids is not None:
                 idx = self._patient_bootstrap_indices(np.asarray(patient_ids), len(y_true))
             else:
-                idx = self.rng.choice(len(y_true), size=len(y_true), replace=True)
+                idx = stratified_bootstrap_indices(self.rng, y_true, len(y_true))
             try:
                 if average is None and len(y_pred_proba.shape) > 1:
                     aurocs = []
@@ -529,10 +558,12 @@ class SurvivalMetrics:
 
         main_cindex = compute_cindex(event_indicator, time_to_event, predicted_risk)
 
-        # Bootstrap
+        # Stratified bootstrap (preserve event/censored ratio)
         bootstrap_cindexes = []
         for _ in range(self.bootstrap_iterations):
-            idx = self.rng.choice(len(time_to_event), size=len(time_to_event), replace=True)
+            idx = stratified_bootstrap_indices(
+                self.rng, event_indicator.astype(int), len(time_to_event)
+            )
             cindex = compute_cindex(
                 event_indicator[idx],
                 time_to_event[idx],
