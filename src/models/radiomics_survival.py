@@ -207,6 +207,9 @@ class CoxProportionalHazards:
             raise RuntimeError("Model not fitted yet")
 
         risk_scores = self.predict(X)
+        # lifelines concordance_index expects: higher predicted = longer survival.
+        # predict_partial_hazard returns: higher = higher risk (shorter survival).
+        # Negate to align conventions.
         c_index = concordance_index(T, -risk_scores, E)
 
         return c_index

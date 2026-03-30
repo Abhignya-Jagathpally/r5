@@ -51,7 +51,11 @@ class TileClassifier(nn.Module):
         self.feature_dim = 2048
 
         # Load pretrained ResNet50
-        self.backbone = models.resnet50(pretrained=pretrained)
+        if pretrained:
+            weights = models.ResNet50_Weights.IMAGENET1K_V1
+        else:
+            weights = None
+        self.backbone = models.resnet50(weights=weights)
 
         # Remove original classification head
         self.backbone.fc = nn.Identity()

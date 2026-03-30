@@ -210,7 +210,7 @@ class LateFusion(MultimodalFusion):
             concat_logits = torch.cat(logits_list, dim=1)  # (B, num_modalities * num_classes)
             weights = F.softmax(self.weight_network(concat_logits), dim=1)  # (B, num_modalities)
         else:
-            weights = torch.ones(B, self.num_modalities, device=B) / self.num_modalities
+            weights = torch.ones(B, self.num_modalities, device=logits_list[0].device) / self.num_modalities
 
         # Apply modality mask if provided
         if modality_mask is not None:

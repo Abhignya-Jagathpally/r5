@@ -5,9 +5,12 @@ Reads from Zarr embedding store, handles variable-length bags,
 supports sampling strategies (all, random, top-k).
 """
 
+import logging
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 import pandas as pd
 import torch
 import zarr
@@ -154,13 +157,19 @@ class MILDataset(Dataset):
                 coordinates = coordinates[indices]
 
         elif self.sampling_strategy == "topk":
-            # Keep top-k patches (would need attention weights, not implemented here)
+            # Top-k by embedding L2 norm as a proxy for informativeness.
+            # True top-k requires attention weights from a trained model, which
+            # are not available at data loading time. Norm-based selection
+            # preferentially keeps high-signal patches over near-zero background.
             if self.max_patches is not None and len(embeddings) > self.max_patches:
-                indices = np.random.choice(
-                    len(embeddings), self.max_patches, replace=False
-                )
+                norms = np.linalg.norm(embeddings, axis=1)
+                indices = np.argsort(norms)[-self.max_patches:]  # highest norms
                 embeddings = embeddings[indices]
                 coordinates = coordinates[indices]
+                logger.debug(
+                    f"topk sampling: selected {self.max_patches}/{len(norms)} patches "
+                    f"by embedding norm (min={norms[indices].min():.2f}, max={norms[indices].max():.2f})"
+                )
 
         # Convert to tensors
         embeddings_tensor = torch.FloatTensor(embeddings)
@@ -263,10 +272,27 @@ class SplitsManager:
         self.validate()
 
     def validate(self):
-        """Validate CSV format."""
+        """Validate CSV format and patient-level split integrity."""
         required_cols = {"slide_id", "label", "split"}
         if not required_cols.issubset(self.df.columns):
             raise ValueError(f"CSV must contain columns: {required_cols}")
+
+        # Check patient-level split integrity if patient_id column exists
+        if "patient_id" in self.df.columns:
+            for pid, group in self.df.groupby("patient_id"):
+                splits_for_patient = group["split"].unique()
+                if len(splits_for_patient) > 1:
+                    raise ValueError(
+                        f"Patient-level leakage detected: patient '{pid}' appears in "
+                        f"multiple splits: {list(splits_for_patient)}. "
+                        f"All slides from the same patient must be in the same split."
+                    )
+            logger.info("Patient-level split integrity verified: no leakage detected")
+        else:
+            logger.warning(
+                "Splits CSV has no 'patient_id' column — cannot verify patient-level "
+                "split integrity. Risk of data leakage if multiple slides per patient."
+            )
 
     def get_split(
         self,

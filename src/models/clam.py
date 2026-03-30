@@ -364,17 +364,21 @@ class CLAMTrainer:
                     logits = logits.unsqueeze(0)
                     loss = self.criterion(logits, bag_label)
 
-                    # Instance clustering loss (optional)
+                    # Instance clustering loss (optional, per Lu et al. 2021)
                     if self.inst_lambda > 0.0 and hasattr(self.model, "get_instance_predictions"):
                         inst_logits = self.model.get_instance_predictions(bag_embeddings)
-                        # Pseudo-label: majority vote from bag
-                        pseudo_label = bag_label.item()
-                        pseudo_labels = torch.full(
-                            (bag_embeddings.shape[0],),
-                            pseudo_label,
-                            dtype=torch.long,
-                            device=self.device,
-                        )
+                        # Soft pseudo-labels from attention weights (not hard bag label)
+                        # High-attention tiles get the bag label; low-attention tiles
+                        # get the opposite label. This avoids oversupplying supervision.
+                        _, attn_weights = self.model(bag_embeddings)
+                        attn_weights = attn_weights.detach()
+                        attn_median = attn_weights.median()
+                        bag_label_val = bag_label.item()
+                        pseudo_labels = torch.where(
+                            attn_weights > attn_median,
+                            torch.tensor(bag_label_val, device=self.device),
+                            torch.tensor(1 - bag_label_val, device=self.device),
+                        ).long()
                         inst_loss = self.criterion(inst_logits, pseudo_labels)
                         loss = loss + self.inst_lambda * inst_loss
 
