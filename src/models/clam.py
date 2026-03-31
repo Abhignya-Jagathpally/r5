@@ -9,7 +9,6 @@ Implements:
 
 from typing import Dict, Optional, Tuple
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,75 +19,77 @@ from torch.utils.data import DataLoader
 
 
 class AttentionLayer(nn.Module):
-    """Single attention head for CLAM."""
+    """Gated attention mechanism (Ilse et al. 2018, Lu et al. 2021).
+
+    Computes: a = softmax(W · (tanh(V·h) ⊙ sigmoid(U·h)))
+    Linear in N (number of instances), not quadratic.
+    """
 
     def __init__(
         self,
         input_dim: int,
         hidden_dim: int,
         attention_dim: int,
+        dropout: float = 0.0,
     ):
-        """Initialize attention layer.
+        """Initialize gated attention layer.
 
         Args:
             input_dim: Input feature dimension
-            hidden_dim: Hidden dimension
-            attention_dim: Attention mechanism dimension
+            hidden_dim: Hidden dimension (output dim for value projection)
+            attention_dim: Internal attention dimension
+            dropout: Dropout on attention scores
         """
         super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
 
-        # Query and Key transformations (Lu et al. 2021)
-        self.q = nn.Linear(input_dim, attention_dim)
-        self.k = nn.Linear(input_dim, attention_dim)
+        # Gated attention paths (Ilse et al. 2018)
+        self.V = nn.Sequential(
+            nn.Linear(input_dim, attention_dim),
+            nn.Tanh(),
+        )
+        self.U = nn.Sequential(
+            nn.Linear(input_dim, attention_dim),
+            nn.Sigmoid(),
+        )
+        self.W = nn.Linear(attention_dim, 1)
+        self.attn_dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
-        # Value transformation
-        self.v = nn.Sequential(
+        # Value transformation — LayerNorm instead of BatchNorm1d so that
+        # single-slide inference (batch_size=1) works correctly.
+        self.value = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.ReLU(inplace=True),
         )
-
-        # FIXME: scale factor assumes attention_dim is always reasonable (64-256).
-        # Very large attention_dim can cause vanishing gradients after softmax.
-        self.scale = 1.0 / np.sqrt(attention_dim)
 
     def forward(
         self,
         embeddings: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass per Lu et al. 2021 CLAM paper.
+        """Forward pass per Ilse et al. 2018 / Lu et al. 2021 CLAM paper.
 
         Args:
             embeddings: (num_tiles, input_dim)
 
         Returns:
             (aggregated, attention_weights)
+              aggregated: (hidden_dim,) — slide-level representation
+              attention_weights: (num_tiles,) — per-tile importance
         """
-        # Compute queries and keys
-        q = self.q(embeddings)  # (num_tiles, attention_dim)
-        k = self.k(embeddings)  # (num_tiles, attention_dim)
+        # Gated attention: a = softmax(W · (tanh(V·h) ⊙ sigmoid(U·h)))
+        v = self.V(embeddings)          # (num_tiles, attention_dim)
+        u = self.U(embeddings)          # (num_tiles, attention_dim)
+        scores = self.W(v * u)          # (num_tiles, 1)  — element-wise gate
+        scores = self.attn_dropout(scores)
+        attention_weights = torch.softmax(scores.squeeze(-1), dim=0)  # (num_tiles,)
 
-        # Compute attention scores: Q · K^T per Lu et al. 2021
-        scores = torch.mm(q, k.t()) * self.scale  # (num_tiles, num_tiles)
+        # Value projection
+        h = self.value(embeddings)      # (num_tiles, hidden_dim)
 
-        # Apply softmax row-wise (each tile attends over all tiles)
-        attn_matrix = F.softmax(scores, dim=1)  # (num_tiles, num_tiles)
-
-        # Transform to values
-        v = self.v(embeddings)  # (num_tiles, hidden_dim)
-
-        # Context vectors: each tile's attended representation
-        context = torch.mm(attn_matrix, v)  # (num_tiles, hidden_dim)
-
-        # Pool across tiles: attention-weighted sum using column-wise
-        # importance (how much each tile is attended to by all others)
-        attention_weights = attn_matrix.sum(dim=0)  # (num_tiles,)
-        attention_weights = attention_weights / (attention_weights.sum() + 1e-8)
-
-        # Aggregate
-        aggregated = torch.sum(context * attention_weights.unsqueeze(1), dim=0)
+        # Attention-weighted aggregation (O(N), not O(N²))
+        aggregated = torch.sum(h * attention_weights.unsqueeze(1), dim=0)  # (hidden_dim,)
 
         return aggregated, attention_weights
 
@@ -383,7 +384,7 @@ class CLAMTrainer:
                         # Soft pseudo-labels from attention weights (not hard bag label)
                         # High-attention tiles get the bag label; low-attention tiles
                         # get the opposite label. This avoids oversupplying supervision.
-                        _, attn_weights = self.model(bag_embeddings)
+                        _, attn_weights = self.model(bag_embeddings, return_attention=True)
                         attn_weights = attn_weights.detach()
                         attn_median = attn_weights.median()
                         bag_label_val = bag_label.item()

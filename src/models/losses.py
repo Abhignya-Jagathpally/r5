@@ -63,10 +63,13 @@ class CoxPartialLikelihoodLoss(nn.Module):
         sorted_events = event_indicators[sorted_indices]
 
         # Risk set: for each event at time t_i, the at-risk set includes all
-        # subjects with event time >= t_i. With descending sort, the at-risk
-        # set at position i is the REVERSE cumsum (from end to start).
+        # subjects with event time >= t_i.  With DESCENDING sort (largest
+        # time first), cumsum from the top accumulates subjects whose time
+        # is >= the current time — exactly the at-risk set we need.
+        # NOTE: the previous flip-cumsum-flip gave cumsum from the bottom
+        # (subjects with t <= t_i), which is the WRONG direction for Cox PH.
         exp_scores = sorted_scores.exp()
-        cumsum_scores = torch.cumsum(exp_scores.flip(0), dim=0).flip(0)
+        cumsum_scores = torch.cumsum(exp_scores, dim=0)
 
         # Loss for each event
         loss = 0.0
