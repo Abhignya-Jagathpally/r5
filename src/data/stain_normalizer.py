@@ -12,7 +12,6 @@ from typing import Optional, Tuple, List
 import cv2
 import numpy as np
 from PIL import Image
-from scipy.sparse.linalg import eigsh
 
 logger = logging.getLogger(__name__)
 
@@ -48,52 +47,94 @@ class Macenko:
         self.HERef = None
         self.maxCRef = None
 
+    def _estimate_stain_vectors(self, od_hat: np.ndarray, percentile: float = 1.0) -> np.ndarray:
+        """Estimate stain vectors using angular robust estimation (Macenko 2009).
+
+        Projects OD values onto the SVD plane and finds stain vectors at
+        extreme angles, rather than using PCA directions directly.
+
+        Parameters
+        ----------
+        od_hat : np.ndarray
+            OD values above threshold, shape (N, 3)
+        percentile : float
+            Percentile for robust angle estimation (default: 1.0)
+
+        Returns
+        -------
+        np.ndarray
+            Stain matrix of shape (2, 3), rows are unit stain vectors
+        """
+        # SVD to find the plane of best fit (top 2 right singular vectors)
+        _, _, Vt = np.linalg.svd(od_hat, full_matrices=False)
+        plane = Vt[:2, :]  # (2, 3)
+
+        # Project OD pixels onto this 2D plane
+        projected = od_hat @ plane.T  # (N, 2)
+
+        # Angular coordinates in the projected plane
+        angles = np.arctan2(projected[:, 1], projected[:, 0])
+
+        # Robust extreme angles via percentiles
+        min_angle = np.percentile(angles, percentile)
+        max_angle = np.percentile(angles, 100 - percentile)
+
+        # Stain vectors from extreme angles, projected back to 3D
+        vec1 = np.array([np.cos(min_angle), np.sin(min_angle)]) @ plane
+        vec2 = np.array([np.cos(max_angle), np.sin(max_angle)]) @ plane
+
+        # Ensure H&E ordering: hematoxylin absorbs more red (higher OD
+        # in the red channel, index 0) than eosin
+        if vec1[0] > vec2[0]:
+            vec1, vec2 = vec2, vec1
+
+        # Normalize to unit vectors
+        vec1 = vec1 / (np.linalg.norm(vec1) + 1e-8)
+        vec2 = vec2 / (np.linalg.norm(vec2) + 1e-8)
+
+        return np.array([vec1, vec2])
+
     def _get_stain_matrix(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Extract stain color matrix from image using robust OD estimation.
+        Extract stain color matrix from image using Macenko angular estimation.
+
+        Converts to optical density, filters background, then uses SVD
+        projection with angular percentile estimation (Macenko et al. 2009)
+        to robustly identify stain vectors even in sparse tissue regions.
 
         Returns
         -------
         H : np.ndarray
-            Stain matrix (2, 3)
+            Stain matrix (2, 3) — columns are unit stain vectors
         maxC : np.ndarray
             Maximum concentrations (2,)
         """
-        # Convert to OD (optical density)
-        # Avoid log(0) by clipping
-        image_float = image.astype(np.float32) / 255.0
-        image_float = np.clip(image_float, 0.001, 1.0)
-        OD = -np.log(image_float)
+        # Convert to OD (optical density): OD = -log10((I + 1) / 240)
+        od = -np.log10((image.astype(np.float64) + 1) / 240.0)
+        od_reshaped = od.reshape(-1, 3)
 
-        # Reshape for PCA
-        OD_reshaped = OD.reshape(-1, 3)
+        # Remove background pixels (those below OD threshold)
+        od_norm = np.linalg.norm(od_reshaped, axis=1)
+        od_hat = od_reshaped[od_norm > self.beta]
 
-        # Estimate two main stain colors using SVD
-        U, S, _ = np.linalg.svd(OD_reshaped.T @ OD_reshaped, full_matrices=False)
+        if od_hat.shape[0] < 10:
+            # Fall back to identity-like stain vectors if almost no tissue
+            logger.warning("Too few tissue pixels for stain estimation, using defaults")
+            stain_vectors = np.array([[0.6442, 0.7170, 0.2668],
+                                      [0.0927, 0.9545, 0.2828]])
+            H = stain_vectors.T
+            maxC = np.array([1.0, 1.0])
+            return H, maxC
 
-        # Get first two singular vectors (main stain directions)
-        V = U[:, :2]
+        # Angular estimation of stain vectors (Macenko 2009)
+        stain_vectors = self._estimate_stain_vectors(od_hat, percentile=self.alpha)
 
-        # Project OD onto these directions
-        projections = OD_reshaped @ V
+        # Stain matrix: columns are stain vectors, shape (3, 2)
+        H = stain_vectors.T
 
-        # Use percentile to find robust stain directions
-        p_alpha = np.percentile(projections, self.alpha, axis=0)
-        p_100_alpha = np.percentile(projections, 100 - self.alpha, axis=0)
-
-        # Determine which direction is H vs E
-        norms_alpha = np.linalg.norm(p_alpha, axis=None)
-        norms_100_alpha = np.linalg.norm(p_100_alpha, axis=None)
-
-        if norms_alpha > norms_100_alpha:
-            p_alpha, p_100_alpha = p_100_alpha, p_alpha
-
-        # Stain matrix
-        H = np.array([p_100_alpha, p_alpha]).T
-        H = H / (np.linalg.norm(H, axis=0, keepdims=True) + 1e-8)
-
-        # Max concentrations
-        maxC = np.percentile(projections, 100 - self.beta, axis=0)
+        # Compute concentrations for max estimation
+        concentrations = np.linalg.lstsq(H, od_reshaped.T, rcond=None)[0]  # (2, N)
+        maxC = np.percentile(concentrations, 99, axis=1)
 
         return H, maxC
 
@@ -129,22 +170,17 @@ class Macenko:
         np.ndarray
             Normalized image
         """
-        # FIXME: Macenko normalizer occasionally fails on sparse tissue regions
-        # with < 10% tissue content. Current workaround: skip and log.
-        # See also: https://github.com/schaugf/HEnorm_python/issues/3
         if self.HERef is None:
             self.fit(image)
 
         # Get stain matrix of input
         HE, maxC = self._get_stain_matrix(image)
 
-        # Convert to OD
-        image_float = image.astype(np.float32) / 255.0
-        image_float = np.clip(image_float, 0.001, 1.0)
-        OD = -np.log(image_float)
+        # Convert to OD using same formula as _get_stain_matrix
+        OD = -np.log10((image.astype(np.float64) + 1) / 240.0)
+        OD_reshaped = OD.reshape(-1, 3)
 
         # Solve for concentrations
-        OD_reshaped = OD.reshape(-1, 3)
         C = np.linalg.lstsq(HE, OD_reshaped.T, rcond=None)[0]
 
         # Normalize concentrations
@@ -153,8 +189,8 @@ class Macenko:
         # Reconstruct with reference stain
         OD_normalized = self.HERef @ C_normalized
 
-        # Convert back to RGB
-        image_normalized = 255.0 * np.exp(-OD_normalized.T)
+        # Convert back to RGB: inverse of OD = -log10((I+1)/240)
+        image_normalized = 240.0 * np.power(10, -OD_normalized.T) - 1
         image_normalized = image_normalized.reshape(image.shape)
         image_normalized = np.clip(image_normalized, 0, 255).astype(np.uint8)
 
