@@ -1,5 +1,7 @@
-# Model configuration for classical baselines
-# Multiple Myeloma Imaging Pathology & Radiomics Pipeline
+# Model baselines configuration
+# Controls: MIL model architectures (ABMIL, CLAM, TransMIL), training hyperparameters
+# Related: pipeline.yaml (orchestration), data_pipeline.yaml (embedding input),
+#          evaluation.yaml (metrics and splitting)
 
 # Tile-level ResNet50 classifier
 tile_classifier:

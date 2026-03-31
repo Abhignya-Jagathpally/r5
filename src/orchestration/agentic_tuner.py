@@ -1,12 +1,12 @@
 """
-Autoresearch-pattern agentic tuning for biomedical ML pipelines.
+Hyperparameter tuner with safety guardrails.
 
-Implements Andrej Karpathy's autoresearch philosophy with:
-- Locked preprocessing surface (immutable code)
-- Editable training/config surface (agent-modifiable)
-- Single metric optimization with fixed budget
-- Complete experiment logging and reproducibility
-- Safety checks against data leakage and code corruption
+Runs Optuna-based hyperparameter search while enforcing immutability
+of preprocessing code and data splits. Logs all trials for reproducibility.
+
+The 'locked surface' prevents accidental modification of data loading,
+splitting, and normalization during tuning. The 'editable surface' defines
+which hyperparameters the search can modify.
 """
 
 import hashlib
@@ -29,15 +29,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LockedSurface:
-    """
-    Definition of code that CANNOT be modified by agents.
-
-    This includes:
-    - Data loading and preprocessing
-    - Data splitting and cross-validation
-    - Evaluation metrics and comparisons
-    - Experiment infrastructure
-    """
+    """Files and functions that must not change during tuning."""
 
     locked_files: Set[str] = field(default_factory=set)
     locked_functions: Set[str] = field(default_factory=set)
@@ -63,15 +55,7 @@ class LockedSurface:
 
 @dataclass
 class EditableSurface:
-    """
-    Definition of code that CAN be modified by agents.
-
-    This includes:
-    - Model architecture choices
-    - Training hyperparameters
-    - Optimization strategy
-    - Augmentation strategies
-    """
+    """Files, functions, and config keys that tuning is allowed to modify."""
 
     editable_files: Set[str] = field(default_factory=set)
     editable_functions: Set[str] = field(default_factory=set)
@@ -97,7 +81,7 @@ class EditableSurface:
 
 @dataclass
 class AgenticTunerConfig:
-    """Configuration for agentic tuning."""
+    """Configuration for hyperparameter tuning."""
 
     # Optimization objective
     metric: str = "auroc"  # Metric to optimize
@@ -121,7 +105,7 @@ class AgenticTunerConfig:
 
 @dataclass
 class ExperimentResult:
-    """Result from a single agentic tuning experiment."""
+    """Result from a single tuning trial."""
 
     trial_id: int
     timestamp: datetime
@@ -134,15 +118,7 @@ class ExperimentResult:
 
 
 class AgenticTuner:
-    """
-    Agentic tuning orchestrator following autoresearch pattern.
-
-    Key features:
-    - Locked preprocessing + editable training surface
-    - Single metric optimization with fixed budget
-    - Complete experiment logging
-    - Safety verification and leakage detection
-    - Reproducible experiment execution
+    """Hyperparameter tuner with locked preprocessing and editable model config.
 
     Example:
         >>> config = AgenticTunerConfig(metric="auroc", max_trials=20)
@@ -160,14 +136,6 @@ class AgenticTuner:
         locked: LockedSurface,
         editable: EditableSurface,
     ):
-        """
-        Initialize agentic tuner.
-
-        Args:
-            config: AgenticTunerConfig instance
-            locked: LockedSurface definition
-            editable: EditableSurface definition
-        """
         self.config = config
         self.locked = locked
         self.editable = editable
@@ -199,21 +167,7 @@ class AgenticTuner:
         baseline_config: Dict[str, Any],
         modification_generator: Optional[Callable] = None,
     ) -> Dict[str, Any]:
-        """
-        Run agentic tuning optimization.
-
-        Args:
-            train_fn: Function with signature train_fn(config, train_data, val_data) -> metrics
-            data: Tuple of (train_data, val_data)
-            baseline_config: Initial configuration from hyperparameter search
-            modification_generator: Optional function to generate config modifications
-
-        Returns:
-            Dictionary with final results
-
-        Raises:
-            RuntimeError: If tuning fails or safety checks fail
-        """
+        """Run tuning loop. Returns dict with best config, metric, and trial history."""
         train_data, val_data = data
         start_time = time.time()
 
@@ -316,16 +270,7 @@ class AgenticTuner:
         baseline_config: Dict[str, Any],
         modification_fn: Optional[Callable],
     ) -> Dict[str, Any]:
-        """
-        Generate a candidate configuration by modifying baseline.
-
-        Args:
-            baseline_config: Current best configuration
-            modification_fn: Optional custom modification function
-
-        Returns:
-            Candidate configuration
-        """
+        """Generate a candidate config by perturbing the baseline."""
         candidate = baseline_config.copy()
 
         if modification_fn is not None:
@@ -359,19 +304,7 @@ class AgenticTuner:
         metric_value: float,
         wall_clock_seconds: float,
     ) -> ExperimentResult:
-        """
-        Record an experiment result.
-
-        Args:
-            trial_id: Trial number
-            candidate_config: Configuration used
-            baseline_config: Previous best config
-            metric_value: Metric value achieved
-            wall_clock_seconds: Execution time
-
-        Returns:
-            ExperimentResult instance
-        """
+        """Record trial result to memory and disk."""
         # Compute config diff
         config_diff = self._compute_config_diff(baseline_config, candidate_config)
 

@@ -1,4 +1,7 @@
 # Master Pipeline Configuration
+# Controls: end-to-end orchestration, stage selection, global training/eval settings
+# Related: data_pipeline.yaml (preprocessing), model_baselines.yaml (MIL models),
+#          foundation_models.yaml (encoders), evaluation.yaml (metrics/splitting)
 # MM Imaging Pathology & Radiomics Surrogate-Genetics Pipeline
 
 pipeline:

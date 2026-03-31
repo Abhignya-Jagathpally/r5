@@ -1,5 +1,6 @@
-# Evaluation Framework Configuration
-# Multiple Myeloma Imaging Pathology & Radiomics Surrogate-Genetics Pipeline
+# Evaluation framework configuration
+# Controls: data splitting, metrics, experiment tracking, visualization, benchmarks
+# Related: pipeline.yaml (orchestration), model_baselines.yaml (models being evaluated)
 
 splitting:
   method: stratified_patient  # patient, stratified_patient, time_aware, kfold
