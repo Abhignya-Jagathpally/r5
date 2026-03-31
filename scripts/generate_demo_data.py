@@ -15,6 +15,19 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+DEMO_DATA_WARNING = """
+╔══════════════════════════════════════════════════════════════════╗
+║  WARNING: SYNTHETIC DATA FOR TESTING ONLY                       ║
+║                                                                  ║
+║  This script generates random synthetic data to verify that the  ║
+║  pipeline code executes without errors. The generated data has   ║
+║  NO medical or scientific meaning.                               ║
+║                                                                  ║
+║  Any metrics computed on this data are MEANINGLESS and must not  ║
+║  be reported as research results.                                ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
 
 def generate_demo_data(
     output_dir: str = "data",
@@ -37,6 +50,9 @@ def generate_demo_data(
     Returns:
         Dict of paths to generated files.
     """
+    print(DEMO_DATA_WARNING)
+    logger.warning(DEMO_DATA_WARNING)
+
     rng = np.random.RandomState(seed)
     out = Path(output_dir)
 
@@ -213,9 +229,17 @@ def generate_demo_data(
         "data_dir": str(out),
     }
 
+    # Write synthetic data warning file into the output directory
+    warning_path = out / "SYNTHETIC_DATA_WARNING.txt"
+    with open(warning_path, "w") as f:
+        f.write(DEMO_DATA_WARNING)
+    logger.info(f"Synthetic data warning written to {warning_path}")
+
     summary_path = out / "demo_data_summary.json"
     with open(summary_path, "w") as f:
         json.dump({
+            "is_synthetic": True,
+            "warning": "Data is randomly generated for testing only. Metrics are meaningless.",
             "n_patients": n_patients,
             "n_slides": n_slides,
             "n_tiles_total": n_tiles_total,

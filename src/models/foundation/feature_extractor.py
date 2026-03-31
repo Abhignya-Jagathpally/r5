@@ -403,6 +403,12 @@ def get_extractor(
     """
     backbone = backbone.lower().strip()
 
+    if backbone in ("uni2h", "titan"):
+        logger.info(
+            f"Selected {backbone} backbone. Note: this is a gated model requiring "
+            "institutional access. Only resnet50 works without additional setup."
+        )
+
     if backbone == "resnet50":
         if embedding_dim is None:
             embedding_dim = 2048

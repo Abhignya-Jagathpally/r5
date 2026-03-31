@@ -17,6 +17,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import random
 import sys
 import time
@@ -786,6 +787,17 @@ def main() -> int:
         "timings": {},
         "completed_stages": [],
     }
+
+    # Check if running on synthetic data and warn
+    summary_path = os.path.join(data_dir, "demo_data_summary.json")
+    if os.path.exists(summary_path):
+        with open(summary_path) as f:
+            summary = json.load(f)
+        if summary.get("is_synthetic", False):
+            logger.warning(
+                "Running on synthetic demo data. All results are for pipeline "
+                "validation only and have no scientific meaning."
+            )
 
     pipeline_start = time.time()
     failed = False
