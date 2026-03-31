@@ -1,5 +1,6 @@
-# Data processing pipeline configuration for MM imaging
-# Covers WSI tiling, stain normalization, deduplication, and embedding extraction
+# Data pipeline configuration
+# Controls: WSI tiling, stain normalization, deduplication, embedding extraction
+# Related: pipeline.yaml (orchestration), foundation_models.yaml (encoder settings)
 
 # WSI Tiling configuration
 tiling:

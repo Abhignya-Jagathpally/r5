@@ -1,0 +1,22 @@
+# Minimal pipeline configuration
+# This is the simplest config that runs a complete pipeline on demo data.
+# See configs/pipeline.yaml for all available options.
+
+data:
+  input_dir: ./data/slides
+  output_dir: ./data
+  tile_size: 256
+
+model:
+  backbone: resnet50  # Only ResNet50 works without gated model access
+  task: classification
+  num_classes: 2
+
+training:
+  epochs: 10
+  learning_rate: 0.001
+  batch_size: 32
+
+evaluation:
+  metrics: [auroc, accuracy, f1]
+  bootstrap_iterations: 100

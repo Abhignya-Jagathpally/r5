@@ -1,5 +1,7 @@
-# Foundation Models Configuration
-# Multiple Myeloma Imaging Pathology & Radiomics Surrogate-Genetics Pipeline
+# Foundation models configuration
+# Controls: feature extraction backbone, MIL head, multimodal fusion, explainability
+# Related: pipeline.yaml (orchestration), data_pipeline.yaml (tile input),
+#          model_baselines.yaml (classical model alternatives)
 
 feature_extraction:
   # Select backbone: resnet50, uni2h, titan
