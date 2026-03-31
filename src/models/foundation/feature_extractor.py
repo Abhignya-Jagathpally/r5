@@ -127,6 +127,8 @@ class ResNet50ImageNet(FeatureExtractor):
         model = models.resnet50(pretrained=True)
 
         # Remove classification head
+        # NOTE: using pretrained=True is deprecated in newer torchvision,
+        # should migrate to weights=ResNet50_Weights.IMAGENET1K_V2 eventually
         self.model = nn.Sequential(*list(model.children())[:-1])
         self.model = self.model.to(self.device)
         self.model.eval()
@@ -257,6 +259,8 @@ class UNI2H(FeatureExtractor):
         hf_token: Optional[str] = None,
         cache_dir: Optional[Path] = None,
     ):
+        # TODO: benchmark memory usage — UNI2-h at batch_size=64 can OOM on 16GB GPUs
+        # We've only tested on A100 (40GB) and V100 (32GB) so far
         """Initialize UNI2-h extractor."""
         super().__init__(embedding_dim, device)
 

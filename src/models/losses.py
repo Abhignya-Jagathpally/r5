@@ -18,22 +18,13 @@ import torch.nn.functional as F
 
 
 class CrossEntropyLoss(nn.CrossEntropyLoss):
-    """Standard cross-entropy loss for classification.
-
-    Wrapper around PyTorch's CrossEntropyLoss for consistency.
-    """
+    """Thin wrapper around nn.CrossEntropyLoss for API consistency."""
 
     def __init__(
         self,
         weight: Optional[torch.Tensor] = None,
         reduction: str = "mean",
     ):
-        """Initialize cross-entropy loss.
-
-        Args:
-            weight: Manual rescaling weight given to each class
-            reduction: 'none', 'mean', or 'sum'
-        """
         super().__init__(weight=weight, reduction=reduction)
 
 
@@ -44,7 +35,6 @@ class CoxPartialLikelihoodLoss(nn.Module):
     """
 
     def __init__(self):
-        """Initialize Cox loss."""
         super().__init__()
 
     def forward(
@@ -63,6 +53,8 @@ class CoxPartialLikelihoodLoss(nn.Module):
         Returns:
             Scalar loss value
         """
+        # TODO: this O(n) loop is fine for typical cohort sizes (< 1000)
+        # but should vectorize if we ever use this with large survival datasets
         # Sort by event time (descending: latest events first)
         sorted_indices = torch.argsort(event_times, descending=True)
         sorted_times = event_times[sorted_indices]
@@ -105,7 +97,6 @@ class InstanceClusteringLoss(nn.Module):
     """
 
     def __init__(self):
-        """Initialize instance clustering loss."""
         super().__init__()
         self.criterion = nn.CrossEntropyLoss()
 
@@ -207,6 +198,8 @@ class SmoothTopKLoss(nn.Module):
             temperature: Temperature for softmax sharpening
         """
         super().__init__()
+        # FIXME: SmoothTopK gradient can explode with temperature < 0.1
+        # Clamping helps but may bias the optimization. Needs investigation.
         self.k = k
         self.temperature = temperature
 

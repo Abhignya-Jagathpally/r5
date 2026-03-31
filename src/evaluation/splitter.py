@@ -303,6 +303,8 @@ class TimeAwareSplitter(PatientLevelSplitter):
                 f"to the same split (determined by earliest scan)."
             )
 
+        # FIXME: time-aware splits assume non-overlapping collection periods
+        # across sites. Multi-site MM cohorts may violate this.
         # Determine cutoffs
         if val_time_cutoff is None:
             val_time_cutoff = patient_times.quantile(0.5)
@@ -410,6 +412,8 @@ class KFoldPatientSplit(PatientLevelSplitter):
         unique_patients = patient_labels.index.values
         labels = patient_labels.values
 
+        # TODO: for very small cohorts (< 50 patients), consider
+        # leave-one-out CV instead — 5-fold can produce unstable estimates
         # Create stratified k-fold splitter
         skf = StratifiedKFold(
             n_splits=self.n_splits,

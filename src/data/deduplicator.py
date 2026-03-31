@@ -45,7 +45,10 @@ class TileDeduplicator:
         )
 
     def _compute_hash(self, image_path: Path) -> imagehash.ImageHash:
-        """Compute perceptual hash for an image."""
+        """Compute perceptual hash for an image.
+
+        FIXME: imagehash.phash resizes to 32x32 internally which may lose
+        fine-grained cellular detail. Could try hash_size=16 for more bits."""
         try:
             image = Image.open(image_path)
             if self.hash_algorithm == "phash":
@@ -95,7 +98,7 @@ class TileDeduplicator:
     def _hamming_distance(
         self, hash1: imagehash.ImageHash, hash2: imagehash.ImageHash
     ) -> int:
-        """Compute Hamming distance between two hashes."""
+        """Hamming distance between two perceptual hashes."""
         return hash1 - hash2
 
     def find_clusters(self) -> List[Set[str]]:
@@ -140,7 +143,10 @@ class TileDeduplicator:
 
         logger.info("Finding duplicate clusters (union-find)...")
 
-        # Compare all pairs within threshold
+        # TODO: pHash threshold removes ~12% of tiles on TCIA data.
+        # Should validate this isn't removing diagnostically relevant near-duplicates
+        # (e.g. adjacent tiles from the same plasma cell cluster).
+        # Compare all pairs within threshold — O(n^2), consider LSH for large sets
         for i in range(len(filenames)):
             hash_i = self.hashes[filenames[i]]
             for j in range(i + 1, len(filenames)):

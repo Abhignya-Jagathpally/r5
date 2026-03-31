@@ -72,11 +72,11 @@ class WSITiler:
         )
 
     def _is_svs(self, slide_path: str) -> bool:
-        """Check if file is SVS format (requires openslide)."""
+        """Check if file is SVS/TIFF (requires openslide)."""
         return slide_path.lower().endswith((".svs", ".tiff", ".tif")) and openslide is not None
 
     def _get_downsampling_factor(self, slide) -> float:
-        """Get downsampling factor from OpenSlide metadata."""
+        """Get downsampling factor for target magnification."""
         try:
             properties = slide.properties
             if "openslide.objective-power" in properties:
@@ -102,6 +102,8 @@ class WSITiler:
         # Extract saturation channel (S)
         saturation = hsv[:, :, 1]
 
+        # TODO: tissue detection threshold was tuned on H&E stains only,
+        # may need adjustment for IHC or special stains (e.g. CD138 for MM)
         # Tissue typically has higher saturation; background is low saturation
         tissue_mask = saturation > self.tissue_saturation_threshold
 
@@ -110,6 +112,8 @@ class WSITiler:
 
     def _is_blurry(self, tile: np.ndarray, laplacian_threshold: float = 15.0) -> bool:
         """Check if tile is blurry using Laplacian variance."""
+        # FIXME: Laplacian threshold 15.0 was picked from HistoQC defaults but
+        # aspirate smears have different texture — probably needs per-modality tuning
         gray = cv2.cvtColor(tile, cv2.COLOR_RGB2GRAY)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         return laplacian_var < laplacian_threshold
@@ -355,6 +359,8 @@ class WSITiler:
 
         all_tiles = []
 
+        # TODO: ThreadPoolExecutor is fine for I/O-bound SVS reads but
+        # ProcessPoolExecutor might be better for CPU-bound standard images
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(

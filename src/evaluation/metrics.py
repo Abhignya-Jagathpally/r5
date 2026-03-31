@@ -119,7 +119,8 @@ class ClassificationMetrics:
             )
             return False
 
-        # Check minimum class size for reliable estimates
+        # FIXME: the minimum class size warning (5) is conservative for bootstrap
+        # but 10 is probably more realistic for stable AUROC estimates
         min_class_size = min(np.sum(y_true == c) for c in unique_classes)
         if min_class_size < 5:
             logger.warning(
@@ -485,6 +486,9 @@ class SurvivalMetrics:
         self.bootstrap_iterations = bootstrap_iterations
         self.rng = np.random.RandomState(random_seed)
 
+    # TODO: concordance_index_censored from sksurv doesn't handle tied
+    # predictions well — consider switching to lifelines' implementation
+    # (we partially do this already via the try/except below)
     def concordance_index(
         self,
         event_indicator: np.ndarray,

@@ -408,5 +408,54 @@ class TestVisualization(unittest.TestCase):
             self.assertTrue(Path(str(output_path) + '.png').exists())
 
 
+class TestMetricsBehavior(unittest.TestCase):
+    """Tests that verify metric values on known data, not just types."""
+
+    def test_auroc_perfectly_separable(self):
+        """AUROC on perfectly separable data should be 1.0."""
+        y_true = np.array([0, 0, 0, 1, 1, 1])
+        y_score = np.array([0.1, 0.2, 0.3, 0.7, 0.8, 0.9])
+
+        metrics = ClassificationMetrics(bootstrap_iterations=50, random_seed=42)
+        result = metrics.compute_auroc(y_true, y_score)
+
+        self.assertAlmostEqual(result['auroc'].value, 1.0, places=5,
+                               msg="Perfectly separable data should give AUROC=1.0")
+
+    def test_auroc_random_baseline(self):
+        """AUROC on random data should be approximately 0.5."""
+        rng = np.random.RandomState(42)
+        y_true = rng.randint(0, 2, 500)
+        y_score = rng.random(500)
+
+        metrics = ClassificationMetrics(bootstrap_iterations=50, random_seed=42)
+        result = metrics.compute_auroc(y_true, y_score)
+
+        self.assertAlmostEqual(result['auroc'].value, 0.5, delta=0.08,
+                               msg="Random predictions should give AUROC near 0.5")
+
+    def test_accuracy_all_correct(self):
+        """Accuracy should be 1.0 when all predictions are correct."""
+        y_true = np.array([0, 1, 0, 1, 0, 1])
+        y_pred = np.array([0, 1, 0, 1, 0, 1])
+
+        metrics = ClassificationMetrics(bootstrap_iterations=50, random_seed=42)
+        result = metrics.compute_accuracy(y_true, y_pred)
+
+        self.assertAlmostEqual(result.value, 1.0, places=5)
+
+    def test_sensitivity_known_values(self):
+        """Sensitivity should be TP / (TP + FN)."""
+        # 3 true positives, 1 false negative -> sensitivity = 0.75
+        y_true = np.array([1, 1, 1, 1, 0, 0, 0, 0])
+        y_pred = np.array([1, 1, 1, 0, 0, 0, 0, 0])
+
+        metrics = ClassificationMetrics(bootstrap_iterations=50, random_seed=42)
+        result = metrics.compute_sensitivity_specificity_ppv_npv(y_true, y_pred)
+
+        self.assertAlmostEqual(result['sensitivity'].value, 0.75, places=5)
+        self.assertAlmostEqual(result['specificity'].value, 1.0, places=5)
+
+
 if __name__ == '__main__':
     unittest.main()

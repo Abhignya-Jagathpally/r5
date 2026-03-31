@@ -50,7 +50,8 @@ class AttentionLayer(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        # Attention weights
+        # FIXME: scale factor assumes attention_dim is always reasonable (64-256).
+        # Very large attention_dim can cause vanishing gradients after softmax.
         self.scale = 1.0 / np.sqrt(attention_dim)
 
     def forward(
@@ -217,6 +218,8 @@ class CLAM_MB(nn.Module):
             nn.Linear(hidden_dim, num_classes),
         )
 
+        # TODO: instance-level clustering loss weight (0.3) is from the CLAM paper
+        # defaults but hasn't been validated on MM tissue specifically
         # Instance-level classifier for pseudo-labels
         if inst_cluster:
             self.instance_classifier = nn.Sequential(
@@ -502,7 +505,7 @@ class CLAMTrainer:
         }
 
     def _save_checkpoint(self, epoch: int):
-        """Save checkpoint."""
+        """Save model checkpoint to disk."""
         checkpoint = {
             "epoch": epoch,
             "model_state": self.model.state_dict(),
@@ -514,7 +517,7 @@ class CLAMTrainer:
         torch.save(checkpoint, path)
 
     def load_checkpoint(self, checkpoint_path: str):
-        """Load checkpoint."""
+        """Restore model state from checkpoint file."""
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state"])

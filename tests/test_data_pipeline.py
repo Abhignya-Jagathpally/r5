@@ -411,5 +411,67 @@ class TestEmbeddingExtractor:
             assert len(filenames) == 3
 
 
+class TestTilingBehavior:
+    """Tests that verify actual tiling output, not just function calls."""
+
+    def test_tile_dimensions_match_config(self, tmp_path):
+        """Tiles produced should match the configured tile_size."""
+        import cv2
+
+        # Create a real test image (not mocked)
+        img = Image.fromarray(
+            np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8)
+        )
+        img_path = tmp_path / "test_slide.png"
+        img.save(str(img_path))
+
+        tile_size = 128
+        tiler = WSITiler(
+            tile_size=tile_size,
+            overlap=0,
+            min_tissue_fraction=0.0,
+            output_dir=str(tmp_path / "tiles"),
+        )
+        tiles_data = tiler.process_standard_image(str(img_path), "test")
+
+        # Verify at least some tiles were extracted
+        assert len(tiles_data) > 0, "Should produce tiles from a 512x512 image"
+
+        # Read back a saved tile and verify its pixel dimensions
+        sample_tile_path = tmp_path / "tiles" / tiles_data[0]["tile_filename"]
+        saved_tile = cv2.imread(str(sample_tile_path))
+        assert saved_tile.shape[0] == tile_size
+        assert saved_tile.shape[1] == tile_size
+
+    def test_stain_normalization_preserves_shape(self):
+        """Normalized image should have same dimensions and dtype as input."""
+        img = np.random.randint(50, 200, (256, 256, 3), dtype=np.uint8)
+
+        normalizer = Macenko()
+        normalizer.fit(img)
+        normalized = normalizer.transform(img)
+
+        assert normalized.shape == img.shape, "Shape should be preserved"
+        assert normalized.dtype == np.uint8, "dtype should remain uint8"
+        assert normalized.min() >= 0 and normalized.max() <= 255
+
+    def test_tissue_fraction_ordering(self):
+        """Tiles with more tissue should have higher tissue_fraction scores."""
+        tiler = WSITiler(tile_size=256)
+
+        # Almost all tissue (dark, saturated)
+        high_tissue = np.full((256, 256, 3), [120, 80, 150], dtype=np.uint8)
+        # Almost all background (white)
+        low_tissue = np.full((256, 256, 3), 245, dtype=np.uint8)
+
+        high_frac = tiler._detect_tissue(high_tissue)
+        low_frac = tiler._detect_tissue(low_tissue)
+
+        assert high_frac > low_frac, (
+            f"High-tissue tile ({high_frac:.2f}) should score higher than "
+            f"background tile ({low_frac:.2f})"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

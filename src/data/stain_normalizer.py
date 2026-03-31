@@ -129,6 +129,9 @@ class Macenko:
         np.ndarray
             Normalized image
         """
+        # FIXME: Macenko normalizer occasionally fails on sparse tissue regions
+        # with < 10% tissue content. Current workaround: skip and log.
+        # See also: https://github.com/schaugf/HEnorm_python/issues/3
         if self.HERef is None:
             self.fit(image)
 
@@ -283,7 +286,7 @@ class StainNormalizer:
         )
 
     def _is_mostly_background(self, image: np.ndarray) -> bool:
-        """Check if image is >80% background (white/empty)."""
+        """Check if tile is mostly empty background."""
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         # Background is high intensity (close to white, 255)
@@ -292,18 +295,20 @@ class StainNormalizer:
         return background_frac > self.max_background_fraction
 
     def _is_blurry(self, image: np.ndarray) -> bool:
-        """Check if image is blurry using Laplacian variance."""
+        """Laplacian variance blur check."""
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         return laplacian_var < self.min_laplacian_variance
 
     def _has_pen_marks(self, image: np.ndarray) -> bool:
-        """Detect pen marks by color (blue, green, red pen inks)."""
+        """Detect pen marks via HSV color ranges."""
         # Convert to HSV for color-based detection
         hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         h = hsv[:, :, 0]
         s = hsv[:, :, 1]
 
+        # NOTE: pen mark thresholds were calibrated on TCIA CMB-MML slides.
+        # Other scanners (Aperio vs Hamamatsu) may shift hue ranges slightly.
         # Blue pen: H ~= 100-130, high saturation
         blue_mask = (h > 100) & (h < 130) & (s > 150)
 
