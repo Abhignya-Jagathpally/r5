@@ -32,6 +32,7 @@ Usage:
 """
 
 import os
+import warnings
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, Union, List
 import logging
@@ -43,6 +44,16 @@ from torch.utils.data import Dataset, DataLoader
 import joblib
 
 logger = logging.getLogger(__name__)
+
+# TITAN is a gated model from Mass General Brigham.
+# Paper: Nature Medicine 2025
+# Access requires institutional agreement.
+# Without access, this encoder will not function.
+_GATED_MODEL_WARNING = (
+    "TITAN requires institutional access to MahmoodLab/TITAN. "
+    "See the model card for access requirements. "
+    "This encoder will raise an error if weights are unavailable."
+)
 
 
 class TITANEncoder(nn.Module):
@@ -123,6 +134,7 @@ class TITANEncoder(nn.Module):
                     )
 
         except Exception as e:
+            logger.warning(_GATED_MODEL_WARNING)
             logger.warning(
                 f"Could not load TITAN from transformers: {e}. "
                 "Attempting alternative loading method..."
@@ -140,8 +152,10 @@ class TITANEncoder(nn.Module):
                 self.model.eval()
                 logger.info("TITAN model loaded via timm")
             except Exception as e2:
+                logger.warning(_GATED_MODEL_WARNING)
                 raise RuntimeError(
-                    f"Failed to load TITAN model: {e} (timm) / {e2} (transformers)"
+                    f"Failed to load TITAN model: {e} (timm) / {e2} (transformers). "
+                    f"TITAN requires institutional access to MahmoodLab/TITAN."
                 )
 
     def _get_slide_transform(self):

@@ -32,6 +32,7 @@ Usage:
 """
 
 import os
+import warnings
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, Union
 import logging
@@ -46,6 +47,16 @@ from huggingface_hub import hf_api, login
 import joblib
 
 logger = logging.getLogger(__name__)
+
+# UNI2-h is a gated model requiring institutional access.
+# Apply at: https://huggingface.co/MahmoodLab/UNI2-h
+# License: CC-BY-NC-ND 4.0 (non-commercial academic use only)
+# Without access, this encoder will fall back to a generic ViT or raise an error.
+_GATED_MODEL_WARNING = (
+    "UNI2-h requires HuggingFace authentication and approved access to "
+    "MahmoodLab/UNI2-h. See https://huggingface.co/MahmoodLab/UNI2-h for access. "
+    "Falling back to ResNet50 features if unavailable."
+)
 
 
 class TileDataset(Dataset):
@@ -190,7 +201,8 @@ class UNI2HEncoder(nn.Module):
                 self.model.load_state_dict(state_dict, strict=False)
                 logger.info("Loaded UNI2-h weights from HuggingFace")
             except Exception as e:
-                logger.warning(f"Could not load UNI2-h weights: {e}. Using CLIP ViT-H/14")
+                logger.warning(_GATED_MODEL_WARNING)
+                logger.warning(f"Could not load UNI2-h weights: {e}. Using CLIP ViT-H/14 fallback.")
 
             self.model = self.model.to(self.device)
             self.model.eval()
