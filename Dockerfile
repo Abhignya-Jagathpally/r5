@@ -1,5 +1,9 @@
 # Production Dockerfile for MM Imaging Radiomics Pipeline
 # Multi-stage build for optimized image size
+#
+# NOTE: Orchestration tools (Snakemake, Nextflow) are NOT included in this
+# container image. They manage containers externally and should be installed
+# on the host or in a separate orchestration environment.
 
 # ============================================================================
 # Stage 1: Builder

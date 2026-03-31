@@ -17,6 +17,12 @@ from datetime import datetime
 
 import numpy as np
 
+try:
+    import wandb
+    HAS_WANDB = True
+except ImportError:
+    HAS_WANDB = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -337,11 +343,13 @@ class WandbBackend(ExperimentTracker):
         self.project = project
         self.entity = entity
 
-        try:
-            import wandb
-            self.wandb = wandb
-        except ImportError:
-            raise ImportError("wandb not installed. Install with: pip install wandb")
+        if not HAS_WANDB:
+            raise ImportError(
+                "wandb not installed. W&B tracking is an optional dependency. "
+                "Install with: pip install 'mm-imaging-radiomics-pipeline[tracking]' "
+                "or pip install wandb"
+            )
+        self.wandb = wandb
 
     def start_run(self) -> None:
         """Start a new W&B run."""

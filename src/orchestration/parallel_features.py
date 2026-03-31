@@ -6,15 +6,26 @@ Implements scalable tile processing and radiomics extraction with:
 - Dask-based parallel radiomics extraction across CPU cores
 - Dynamic resource allocation and fault tolerance
 - Progress tracking and memory management
+
+Both Ray and Dask are optional dependencies. When not installed, classes
+will raise informative errors or fall back to multiprocessing.
 """
 
 import logging
+import multiprocessing
 import os
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Any
 
 import numpy as np
+
+try:
+    import dask
+    HAS_DASK = True
+except ImportError:
+    HAS_DASK = False
 
 logger = logging.getLogger(__name__)
 
@@ -225,9 +236,10 @@ class RayTileProcessor:
         try:
             import ray
 
+            remote_fn = ray.remote(num_gpus=0.25)(self._extract_batch_remote)
             futures = []
             for batch in tile_batches:
-                future = self._extract_batch_remote.remote(
+                future = remote_fn.remote(
                     batch, embedding_fn
                 )
                 futures.append(future)
@@ -240,11 +252,14 @@ class RayTileProcessor:
             raise RuntimeError(f"Failed to extract embeddings: {str(e)}")
 
     @staticmethod
-    @ray.remote(num_gpus=0.25)
     def _extract_batch_remote(
         batch: np.ndarray, embedding_fn: Callable
     ) -> np.ndarray:
-        """Extract embeddings from a batch (Ray remote task)."""
+        """Extract embeddings from a batch (Ray remote task).
+
+        Note: This method is wrapped with @ray.remote at runtime in
+        extract_batch_embeddings() to avoid import-time dependency on Ray.
+        """
         try:
             return embedding_fn(batch)
         except Exception as e:
@@ -291,9 +306,19 @@ class DaskRadiomicsExtractor:
         """
         Initialize Dask distributed client.
 
+        Falls back to multiprocessing.Pool if Dask is not installed.
+
         Raises:
-            RuntimeError: If Dask initialization fails
+            RuntimeError: If initialization fails
         """
+        if not HAS_DASK:
+            self.logger.warning(
+                "Dask not installed. Falling back to multiprocessing. "
+                "Install with: pip install 'mm-imaging-radiomics-pipeline[orchestration]'"
+            )
+            self._pool = ProcessPoolExecutor(max_workers=self.config.num_workers)
+            return
+
         try:
             from dask.distributed import Client
 
@@ -340,11 +365,18 @@ class DaskRadiomicsExtractor:
         Raises:
             RuntimeError: If extraction fails
         """
-        if self.client is None:
+        if self.client is None and HAS_DASK:
+            self.initialize()
+        elif not HAS_DASK and not hasattr(self, '_pool'):
             self.initialize()
 
         n_samples = len(images)
         self.logger.info(f"Extracting radiomics from {n_samples} samples")
+
+        if not HAS_DASK:
+            return self._extract_batch_multiprocessing(
+                images, masks, radiomics_fn, **radiomics_kwargs
+            )
 
         try:
             import dask.array as da
@@ -395,9 +427,30 @@ class DaskRadiomicsExtractor:
             self.logger.error(f"Radiomics extraction failed: {str(e)}")
             raise RuntimeError(f"Failed to extract radiomics: {str(e)}")
 
+    def _extract_batch_multiprocessing(
+        self,
+        images: np.ndarray,
+        masks: np.ndarray,
+        radiomics_fn: Callable,
+        **radiomics_kwargs,
+    ) -> np.ndarray:
+        """Fallback batch extraction using multiprocessing when Dask is unavailable."""
+        n_samples = len(images)
+        features = []
+        for i in range(0, n_samples, self.config.chunk_size):
+            chunk_end = min(i + self.config.chunk_size, n_samples)
+            img_chunk = images[i:chunk_end]
+            mask_chunk = masks[i:chunk_end]
+            chunk_result = radiomics_fn(img_chunk, mask_chunk, **radiomics_kwargs)
+            features.append(chunk_result)
+
+        all_features = np.vstack(features)
+        self.logger.info(f"Extracted radiomics (multiprocessing fallback): shape {all_features.shape}")
+        return all_features
+
     @staticmethod
     def _prepare_data(data: np.ndarray) -> Any:
-        """Prepare data for Dask processing."""
+        """Prepare data for Dask processing. Only called when HAS_DASK is True."""
         from dask import delayed
 
         return delayed(lambda x: x)(data)
@@ -424,12 +477,19 @@ class DaskRadiomicsExtractor:
         Raises:
             RuntimeError: If any extraction fails
         """
-        if self.client is None:
+        if self.client is None and HAS_DASK:
+            self.initialize()
+        elif not HAS_DASK and not hasattr(self, '_pool'):
             self.initialize()
 
         self.logger.info(
             f"Submitting {len(image_paths)} radiomics extraction tasks"
         )
+
+        if not HAS_DASK:
+            return self._extract_parallel_multiprocessing(
+                image_paths, mask_paths, radiomics_fn, **radiomics_kwargs
+            )
 
         try:
             futures = {}
@@ -461,6 +521,35 @@ class DaskRadiomicsExtractor:
         except Exception as e:
             self.logger.error(f"Parallel radiomics extraction failed: {str(e)}")
             raise RuntimeError(f"Radiomics extraction failed: {str(e)}")
+
+    def _extract_parallel_multiprocessing(
+        self,
+        image_paths: List[Path],
+        mask_paths: List[Path],
+        radiomics_fn: Callable,
+        **radiomics_kwargs,
+    ) -> Dict[str, np.ndarray]:
+        """Fallback parallel extraction using ProcessPoolExecutor when Dask is unavailable."""
+        results = {}
+        with ProcessPoolExecutor(max_workers=self.config.num_workers) as pool:
+            future_map = {}
+            for img_path, mask_path in zip(image_paths, mask_paths):
+                future = pool.submit(
+                    self._extract_single, img_path, mask_path, radiomics_fn, **radiomics_kwargs
+                )
+                future_map[str(img_path)] = future
+
+            for path, future in future_map.items():
+                try:
+                    results[path] = future.result(timeout=self.config.timeout_seconds)
+                except Exception as e:
+                    self.logger.error(f"Failed to extract radiomics for {path}: {str(e)}")
+                    raise
+
+        self.logger.info(
+            f"Successfully extracted radiomics for {len(results)} files (multiprocessing fallback)"
+        )
+        return results
 
     @staticmethod
     def _extract_single(

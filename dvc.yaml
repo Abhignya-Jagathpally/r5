@@ -1,3 +1,4 @@
+# NOTE: DVC pipeline definition kept for data versioning only. Primary workflow orchestration is via Snakemake.
 # DVC Pipeline Definition
 # MM Imaging Pathology & Radiomics Pipeline
 
