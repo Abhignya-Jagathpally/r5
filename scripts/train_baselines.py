@@ -390,6 +390,16 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     config = load_config(args.config)
+
+    # Validate config schema
+    from src.utils.config_schema import validate_config, validate_no_conflicting_keys
+    errors = validate_config(config, "model_baselines")
+    errors.extend(validate_no_conflicting_keys(config))
+    if errors:
+        for err in errors:
+            print(f"Config validation error: {err}")
+        raise ValueError(f"Config validation failed with {len(errors)} error(s)")
+
     logger = setup_logging(output_dir)
 
     logger.info(f"Training {args.model} with config {args.config}")

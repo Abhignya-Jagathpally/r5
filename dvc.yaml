@@ -202,7 +202,7 @@ stages:
           cache: false
 
   train_fusion:
-    cmd: python main.py --config configs/pipeline.json --stages fusion
+    cmd: python main.py --config configs/pipeline.yaml --stages fusion
       --embeddings_dir results/embeddings
       --radiomics_dir results/radiomics
       --splits_dir results/splits

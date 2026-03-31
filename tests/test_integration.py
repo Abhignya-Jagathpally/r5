@@ -310,7 +310,7 @@ class TestEndToEnd:
         """Verify main.py --dry-run exits cleanly."""
         import subprocess
         result = subprocess.run(
-            ["python3", "main.py", "--config", "configs/pipeline.json",
+            ["python3", "main.py", "--config", "configs/pipeline.yaml",
              "--stages", "all", "--dry-run",
              "--output-dir", pipeline_tmpdir],
             capture_output=True, text=True, timeout=30,
@@ -322,7 +322,7 @@ class TestEndToEnd:
         """Run full pipeline with --demo flag and verify outputs."""
         import subprocess
         result = subprocess.run(
-            ["python3", "main.py", "--config", "configs/pipeline.json",
+            ["python3", "main.py", "--config", "configs/pipeline.yaml",
              "--stages", "all", "--demo", "--device", "cpu",
              "--output-dir", pipeline_tmpdir,
              "--data-dir", os.path.join(pipeline_tmpdir, "data")],

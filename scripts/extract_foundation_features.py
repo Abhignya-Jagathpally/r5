@@ -298,6 +298,15 @@ Examples:
     config = load_config(args.config)
     logger.info(f"Loaded config from {args.config}")
 
+    # Validate config schema
+    from src.utils.config_schema import validate_config, validate_no_conflicting_keys
+    errors = validate_config(config, "foundation_models")
+    errors.extend(validate_no_conflicting_keys(config))
+    if errors:
+        for err in errors:
+            logger.error(f"Config validation error: {err}")
+        raise ValueError(f"Config validation failed with {len(errors)} error(s)")
+
     # Validate paths
     if not args.input_dir.exists():
         logger.error(f"Input directory not found: {args.input_dir}")

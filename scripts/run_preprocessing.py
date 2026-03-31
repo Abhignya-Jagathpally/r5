@@ -369,6 +369,15 @@ def main():
     # Load configuration
     config = load_config(args.config)
 
+    # Validate config schema
+    from src.utils.config_schema import validate_config, validate_no_conflicting_keys
+    errors = validate_config(config, "data_pipeline")
+    errors.extend(validate_no_conflicting_keys(config))
+    if errors:
+        for err in errors:
+            print(f"Config validation error: {err}")
+        raise ValueError(f"Config validation failed with {len(errors)} error(s)")
+
     # Setup logging
     log_dir = config["storage"].get("logs_dir", "logs")
     log_file = setup_logging(log_dir, config["logging"].get("level", "INFO"))

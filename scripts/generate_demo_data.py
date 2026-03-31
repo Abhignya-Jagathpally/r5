@@ -86,6 +86,7 @@ def generate_demo_data(
     })
     patient_path = out / "patient_metadata.csv"
     patient_df.to_csv(patient_path, index=False)
+    logger.warning("SYNTHETIC DATA — metrics are not clinically meaningful")
     logger.info(f"Patient metadata: {patient_path} ({n_patients} patients)")
 
     # ── Slide metadata ────────────────────────────────────────────────
@@ -103,6 +104,7 @@ def generate_demo_data(
     slide_df = pd.DataFrame(slide_records)
     slide_path = out / "slide_metadata.csv"
     slide_df.to_csv(slide_path, index=False)
+    logger.warning("SYNTHETIC DATA — metrics are not clinically meaningful")
     logger.info(f"Slide metadata: {slide_path} ({n_slides} slides)")
 
     # ── Tile manifest ─────────────────────────────────────────────────
@@ -124,6 +126,7 @@ def generate_demo_data(
     tile_df = pd.DataFrame(tile_records)
     tile_manifest_path = out / "tiles" / "tile_manifest.csv"
     tile_df.to_csv(tile_manifest_path, index=False)
+    logger.warning("SYNTHETIC DATA — metrics are not clinically meaningful")
     logger.info(f"Tile manifest: {tile_manifest_path} ({n_tiles_total} tiles)")
 
     # ── Synthetic tile images (small numpy arrays) ────────────────────
@@ -167,6 +170,7 @@ def generate_demo_data(
         out / "embeddings" / "coords.npz",
         **{f"coord_{k}": v for k, v in all_coords.items()},
     )
+    logger.warning("SYNTHETIC DATA — metrics are not clinically meaningful")
     logger.info(f"Embeddings: {embeddings_path} ({embedding_dim}-dim)")
 
     # ── Synthetic radiomics features ──────────────────────────────────
@@ -187,6 +191,7 @@ def generate_demo_data(
 
     radiomics_path = out / "features" / "radiomics_features.csv"
     radiomics_df.to_csv(radiomics_path, index=False)
+    logger.warning("SYNTHETIC DATA — metrics are not clinically meaningful")
     logger.info(f"Radiomics features: {radiomics_path} ({n_radiomics_features} features)")
 
     # ── Train/Val/Test splits (patient-level) ─────────────────────────
@@ -212,6 +217,7 @@ def generate_demo_data(
     splits_df = pd.DataFrame(splits)
     splits_path = out / "splits" / "splits.csv"
     splits_df.to_csv(splits_path, index=False)
+    logger.warning("SYNTHETIC DATA — metrics are not clinically meaningful")
     logger.info(
         f"Splits: {splits_path} "
         f"(train={len(train_patients)}, val={len(val_patients)}, test={len(test_patients)})"
@@ -258,4 +264,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     paths = generate_demo_data()
     print(f"\nDemo data generated. Run pipeline with:")
-    print(f"  python3 main.py --config configs/pipeline.json --stages all --data-dir data")
+    print(f"  python3 main.py --config configs/pipeline.yaml --stages all --data-dir data")

@@ -133,7 +133,11 @@ class Macenko:
         # with < 10% tissue content. Current workaround: skip and log.
         # See also: https://github.com/schaugf/HEnorm_python/issues/3
         if self.HERef is None:
-            self.fit(image)
+            raise ValueError(
+                "Normalizer has not been fitted. Call .fit() with a reference image "
+                "before calling .transform(). Self-fitting would normalize each image "
+                "to itself, defeating the purpose of stain normalization."
+            )
 
         # Get stain matrix of input
         HE, maxC = self._get_stain_matrix(image)
@@ -211,7 +215,11 @@ class Reinhard:
             Normalized image
         """
         if self.reference_mean is None:
-            self.fit(image)
+            raise ValueError(
+                "Normalizer has not been fitted. Call .fit() with a reference image "
+                "before calling .transform(). Self-fitting would normalize each image "
+                "to itself, defeating the purpose of stain normalization."
+            )
 
         # Convert to LAB
         image_lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB).astype(np.float32)

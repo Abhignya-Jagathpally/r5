@@ -780,7 +780,17 @@ def main() -> int:
         log_level = "INFO"
 
     from src.utils.config import load_config, resolve_stage_configs
+    from src.utils.config_schema import validate_config, validate_no_conflicting_keys
+
     master_config = load_config(args.config)
+
+    # Validate config schema
+    errors = validate_config(master_config, "pipeline")
+    errors.extend(validate_no_conflicting_keys(master_config))
+    if errors:
+        for err in errors:
+            logger.error(f"Config validation error: {err}")
+        raise ValueError(f"Config validation failed with {len(errors)} error(s)")
 
     output_dir = args.output_dir or master_config.get("output_dir", "./results")
     data_dir = args.data_dir or master_config.get("data_dir", "./data")

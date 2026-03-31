@@ -372,7 +372,7 @@ if STAGES.get("fusion", True):
             time_min=240,
         shell:
             """
-            python main.py --config configs/pipeline.json --stages fusion \
+            python main.py --config configs/pipeline.yaml --stages fusion \
                 --embeddings_dir {EMBEDDINGS_DIR} \
                 --radiomics_dir {RADIOMICS_DIR} \
                 --splits_dir {SPLITS_DIR} \

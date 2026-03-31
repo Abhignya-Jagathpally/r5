@@ -52,6 +52,16 @@ class EvaluationPipeline:
             config_path (str): Path to evaluation config YAML file
         """
         self.config = self._load_config(config_path)
+
+        # Validate config schema
+        from src.utils.config_schema import validate_config, validate_no_conflicting_keys
+        errors = validate_config(self.config, "evaluation")
+        errors.extend(validate_no_conflicting_keys(self.config))
+        if errors:
+            for err in errors:
+                logger.error(f"Config validation error: {err}")
+            raise ValueError(f"Config validation failed with {len(errors)} error(s)")
+
         self.setup_logging()
         logger.info("Evaluation pipeline initialized")
 
