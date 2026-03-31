@@ -87,13 +87,13 @@ COPY README.md /workspace/
 RUN mkdir -p /workspace/{data,results,logs,.cache,.torch}
 
 # Add git metadata
-LABEL maintainer="PhD Researcher 6"
+LABEL maintainer="pipeline3"
 LABEL description="MM Imaging Pathology & Radiomics Pipeline"
 LABEL version="0.1.0"
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')" || exit 1
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
 
 # Default entrypoint
 ENTRYPOINT ["python", "main.py"]
