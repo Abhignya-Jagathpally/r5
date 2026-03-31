@@ -63,6 +63,10 @@ r5/
 
 ## Benchmark Targets
 
+> **Note:** These are literature reference values, not results from this pipeline.
+> This pipeline has not yet been validated on the listed datasets. Results will be
+> added here as experiments are completed.
+
 | Task | Metric | Value | Source |
 |---|---|---|---|
 | H&E-based t(11;14) detection | AUROC | 0.85 | Published MM morphology study |

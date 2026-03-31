@@ -21,19 +21,24 @@ from sklearn.metrics import roc_curve, auc, precision_recall_curve, confusion_ma
 
 logger = logging.getLogger(__name__)
 
-# Publication-quality settings
-plt.rcParams.update({
-    'figure.dpi': 300,
-    'savefig.dpi': 300,
-    'font.size': 12,
-    'font.family': 'sans-serif',
-    'axes.labelsize': 12,
-    'axes.titlesize': 14,
-    'xtick.labelsize': 11,
-    'ytick.labelsize': 11,
-    'legend.fontsize': 11,
-    'figure.autolayout': True,
-})
+# Consistent publication style for all plots
+PLOT_STYLE = {
+    "font.family": "serif",
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.labelsize": 12,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.fontsize": 10,
+    "figure.dpi": 300,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+}
+
+import matplotlib
+matplotlib.rcParams.update(PLOT_STYLE)
 
 # Colorblind-friendly palette
 COLORBLIND_PALETTE = {

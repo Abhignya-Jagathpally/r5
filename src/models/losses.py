@@ -1,12 +1,13 @@
 """
-Loss functions for classical baselines and MIL models.
+Loss functions for classification, survival, and MIL tasks.
 
-Includes:
-- Standard cross-entropy
-- Cox partial likelihood (survival)
-- Instance-level clustering loss (CLAM)
-- Focal loss (class imbalance)
-- Smooth top-k loss (MIL)
+Recommended usage:
+  - Binary classification (e.g., t(11;14) detection): CrossEntropyLoss or FocalLoss
+  - Multi-class classification: CrossEntropyLoss with class weights
+  - Survival prediction (e.g., PFS/OS): CoxPartialLikelihoodLoss
+  - Class-imbalanced datasets: FocalLoss (alpha=0.25, gamma=2.0) or WeightedFocalLoss
+  - MIL with sparse positive instances: SmoothTopKLoss
+  - CLAM training: CrossEntropyLoss + InstanceClusteringLoss (weight ~0.3)
 """
 
 from typing import Optional
