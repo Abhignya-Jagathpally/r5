@@ -1,8 +1,14 @@
 #!/bin/bash
 
 ################################################################################
-# Master Pipeline Execution Script
+# Master Pipeline Execution Script — Snakemake/Nextflow Orchestration Wrapper
 # MM Imaging Pathology & Radiomics Pipeline
+#
+# NOTE: For the Python pipeline entry point, prefer:
+#     python main.py --help
+#   which supports --config, --stages, --dry-run, --output-dir, --seed,
+#   --list-stages, and --verbose flags directly.
+#   This shell script is a wrapper for Snakemake/Nextflow orchestration.
 #
 # Usage: ./scripts/run_pipeline.sh [OPTIONS]
 #

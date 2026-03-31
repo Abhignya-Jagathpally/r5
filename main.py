@@ -7,11 +7,10 @@ Master orchestrator that runs the full pipeline end-to-end:
     preprocessing → baselines → foundation → fusion → evaluation → report
 
 Usage:
-    python3 main.py --config configs/pipeline.json --stages all
-    python3 main.py --config configs/pipeline.yaml --stages preprocessing baselines
-    python3 main.py --config configs/pipeline.json --stages evaluation --resume
-    python3 main.py --config configs/pipeline.json --dry-run
-    python3 main.py --config configs/pipeline.json --demo  # synthetic data
+    python main.py --config configs/pipeline.yaml --stages all
+    python main.py --config configs/minimal_example.yaml --stages preprocessing,baselines
+    python main.py --config configs/pipeline.yaml --stages evaluation --dry-run
+    python main.py --list-stages
 """
 
 import argparse
@@ -700,24 +699,84 @@ STAGE_HANDLERS = {
 }
 
 
-def main() -> int:
-    """Entry point for the MM Imaging Pathology & Radiomics Pipeline."""
+def parse_args():
+    """Parse command-line arguments for the pipeline."""
     parser = argparse.ArgumentParser(
         description="R5 — MM Imaging Pathology & Radiomics Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
+        epilog="""
+Examples:
+  python main.py --config configs/pipeline.yaml --stages all
+  python main.py --config configs/minimal_example.yaml --stages preprocessing,baselines
+  python main.py --config configs/pipeline.yaml --stages evaluation --dry-run
+  python main.py --list-stages
+        """
     )
-    parser.add_argument("--config", required=True, help="Pipeline config (YAML or JSON)")
-    parser.add_argument("--stages", nargs="+", default=["all"], choices=STAGE_ORDER + ["all"])
-    parser.add_argument("--output-dir", default=None, help="Override output directory")
+    parser.add_argument(
+        "--config", "-c",
+        default="configs/pipeline.yaml",
+        help="Path to pipeline config YAML (default: configs/pipeline.yaml)"
+    )
+    parser.add_argument(
+        "--stages", "-s",
+        default="all",
+        help="Comma-separated stages to run: preprocessing,baselines,foundation,fusion,evaluation,report,all (default: all)"
+    )
+    parser.add_argument(
+        "--dry-run", "-n",
+        action="store_true",
+        help="Validate config and show execution plan without running"
+    )
+    parser.add_argument(
+        "--output-dir", "-o",
+        default=None,
+        help="Override output directory from config"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Override random seed (default: from config)"
+    )
+    parser.add_argument(
+        "--list-stages",
+        action="store_true",
+        help="List available pipeline stages and exit"
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="count",
+        default=0,
+        help="Increase logging verbosity (-v for INFO, -vv for DEBUG)"
+    )
     parser.add_argument("--data-dir", default=None, help="Override data directory")
     parser.add_argument("--device", default=None, help="Compute device (cpu, cuda)")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--resume", action="store_true", help="Resume from latest checkpoint")
     parser.add_argument("--demo", action="store_true", help="Generate synthetic demo data")
-    parser.add_argument("--log-level", default="INFO")
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+PIPELINE_STAGES = STAGE_ORDER  # Alias for --list-stages display
+
+
+def main() -> int:
+    """Entry point for the MM Imaging Pathology & Radiomics Pipeline."""
+    args = parse_args()
+
+    # Handle --list-stages
+    if args.list_stages:
+        print("Available pipeline stages:")
+        for i, stage in enumerate(PIPELINE_STAGES, 1):
+            print(f"  {i}. {stage}")
+        sys.exit(0)
+
+    # Determine log level from --verbose flag
+    if args.verbose >= 2:
+        log_level = "DEBUG"
+    elif args.verbose == 1:
+        log_level = "INFO"
+    else:
+        log_level = "INFO"
 
     from src.utils.config import load_config, resolve_stage_configs
     master_config = load_config(args.config)
@@ -727,7 +786,7 @@ def main() -> int:
     log_dir = master_config.get("log_dir", "./logs")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    log_file = setup_logging(log_dir, args.log_level)
+    log_file = setup_logging(log_dir, log_level)
 
     seed = args.seed or master_config.get("reproducibility", {}).get("seed", 42)
     random.seed(seed)
@@ -748,11 +807,16 @@ def main() -> int:
         except ImportError:
             device = "cpu"
 
-    if "all" in args.stages:
+    requested_stages = [s.strip() for s in args.stages.split(",")]
+    if "all" in requested_stages:
         stage_toggles = master_config.get("stages", {})
         stages = [s for s in STAGE_ORDER if stage_toggles.get(s, True)]
     else:
-        stages = [s for s in STAGE_ORDER if s in args.stages]
+        invalid = [s for s in requested_stages if s not in STAGE_ORDER]
+        if invalid:
+            logger.error(f"Unknown stages: {invalid}. Valid: {STAGE_ORDER}")
+            return 1
+        stages = [s for s in STAGE_ORDER if s in requested_stages]
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
