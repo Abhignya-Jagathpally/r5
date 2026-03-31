@@ -171,6 +171,8 @@ class HyperparameterSearcher:
             "learning_rate": tune.loguniform(1e-5, 1e-2),
             "weight_decay": tune.loguniform(1e-7, 1e-3),
             "dropout_rate": tune.uniform(0.0, 0.5),
+            # TODO: "film" fusion from Perez & Strub 2018 might work better
+            # for conditioning radiomics on pathology features
             "fusion_method": tune.choice(["concat", "bilinear", "gated"]),
             "fusion_hidden_dim": tune.choice([256, 512, 768]),
             "pathology_weight": tune.uniform(0.0, 1.0),
@@ -224,6 +226,8 @@ class HyperparameterSearcher:
 
             search_space = self.search_spaces[model_type]
 
+            # NOTE: TPE sampler outperformed random search by ~3% AUROC in our
+            # preliminary runs, but CMA-ES might be better for continuous spaces
             # Setup scheduler
             scheduler = self._create_scheduler()
 

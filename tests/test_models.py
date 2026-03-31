@@ -492,5 +492,88 @@ class TestIntegration:
         assert inst_logits.shape == (100, 2)
 
 
+class TestModelBehavior:
+    """Tests that verify model outputs and gradient flow, not just construction."""
+
+    def test_abmil_output_shape_varies_with_num_classes(self):
+        """ABMIL output dim should match num_classes for different settings."""
+        for n_classes in [2, 3, 5]:
+            model = ABMIL(
+                input_dim=512,
+                hidden_dim=64,
+                attention_dim=32,
+                num_classes=n_classes,
+                dropout=0.0,
+            )
+            model.eval()
+            embeddings = torch.randn(20, 512)
+            with torch.no_grad():
+                logits = model(embeddings)
+            assert logits.shape == (n_classes,), (
+                f"Expected ({n_classes},), got {logits.shape}"
+            )
+
+    def test_clam_sb_output_shape_varies_with_num_classes(self):
+        """CLAM-SB output dim should match num_classes."""
+        for n_classes in [2, 4]:
+            model = CLAM_SB(
+                input_dim=512,
+                hidden_dim=64,
+                attention_dim=32,
+                num_classes=n_classes,
+                dropout=0.0,
+            )
+            model.eval()
+            embeddings = torch.randn(30, 512)
+            with torch.no_grad():
+                logits = model(embeddings)
+            assert logits.shape == (n_classes,)
+
+    def test_focal_loss_gradients_flow(self):
+        """Focal loss should produce valid gradients for backprop."""
+        loss_fn = FocalLoss(alpha=0.25, gamma=2.0)
+        logits = torch.randn(8, 2, requires_grad=True)
+        targets = torch.randint(0, 2, (8,))
+
+        loss = loss_fn(logits, targets)
+        loss.backward()
+
+        assert logits.grad is not None, "Gradients should flow through focal loss"
+        assert not torch.any(torch.isnan(logits.grad)), "Gradients should not be NaN"
+        assert not torch.any(torch.isinf(logits.grad)), "Gradients should not be Inf"
+
+    def test_cox_loss_gradients_flow(self):
+        """Cox partial likelihood should produce valid gradients."""
+        loss_fn = CoxPartialLikelihoodLoss()
+        risk_scores = torch.randn(10, requires_grad=True)
+        event_times = torch.arange(1.0, 11.0)
+        event_indicators = torch.tensor([1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
+
+        loss = loss_fn(risk_scores, event_times, event_indicators)
+        loss.backward()
+
+        assert risk_scores.grad is not None
+        assert not torch.any(torch.isnan(risk_scores.grad))
+
+    def test_abmil_attention_weights_change_with_input(self):
+        """Attention weights should differ for different inputs."""
+        model = ABMIL(input_dim=512, hidden_dim=64, attention_dim=32,
+                       num_classes=2, dropout=0.0)
+        model.eval()
+
+        torch.manual_seed(0)
+        emb_a = torch.randn(15, 512)
+        torch.manual_seed(99)
+        emb_b = torch.randn(15, 512)
+
+        with torch.no_grad():
+            _, w_a = model(emb_a, return_attention=True)
+            _, w_b = model(emb_b, return_attention=True)
+
+        assert not torch.allclose(w_a, w_b, atol=1e-4), (
+            "Attention weights should differ for different inputs"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
