@@ -83,11 +83,11 @@ if STAGES.get("tiling", True):
             time_min=120,
         shell:
             """
-            python scripts/run_preprocessing.py --steps tiling \
-                --input {input.wsi_dir}/{wildcards.patient_id} \
-                --output {output.tiles} \
-                --tile_size {params.tile_size} \
-                --overlap {params.overlap}
+            python scripts/run_preprocessing.py \
+                --config configs/data_pipeline.yaml \
+                --slides {input.wsi_dir}/{wildcards.patient_id} \
+                --output-dir $(dirname {output.tiles}) \
+                --steps tiling
             """
 
 
@@ -112,10 +112,11 @@ if STAGES.get("stain_norm", True):
             threads=2,
         shell:
             """
-            python scripts/run_preprocessing.py --steps stain_norm \
-                --input {input.tiles} \
-                --output {output.normalized} \
-                --method {params.method}
+            python scripts/run_preprocessing.py \
+                --config configs/data_pipeline.yaml \
+                --slides {input.tiles} \
+                --output-dir $(dirname {output.normalized}) \
+                --steps stain_norm
             """
 
 
@@ -141,11 +142,11 @@ if STAGES.get("dedup", True):
             threads=2,
         shell:
             """
-            python scripts/run_preprocessing.py --steps dedup \
-                --input {input.normalized} \
-                --output {output.deduplicated} \
-                --stats {output.stats} \
-                --threshold {params.threshold}
+            python scripts/run_preprocessing.py \
+                --config configs/data_pipeline.yaml \
+                --slides {input.normalized} \
+                --output-dir $(dirname {output.deduplicated}) \
+                --steps dedup
             """
 
 
@@ -175,12 +176,11 @@ if STAGES.get("embeddings", True):
             time_min=60,
         shell:
             """
-            python scripts/run_preprocessing.py --steps embeddings \
-                --input {input.tiles} \
-                --output {output.embeddings} \
-                --backbone {params.backbone} \
-                --batch_size {params.batch_size} \
-                --checkpoint {params.checkpoint}
+            python scripts/run_preprocessing.py \
+                --config configs/data_pipeline.yaml \
+                --slides {input.tiles} \
+                --output-dir $(dirname {output.embeddings}) \
+                --steps embeddings
             """
 
 
@@ -208,11 +208,11 @@ if STAGES.get("radiomics", True):
             time_min=30,
         shell:
             """
-            python scripts/run_preprocessing.py --steps radiomics \
-                --image {input.image} \
-                --mask {input.mask} \
-                --output {output.features} \
-                --features {params.features_to_extract}
+            python scripts/run_preprocessing.py \
+                --config configs/data_pipeline.yaml \
+                --slides {input.image} \
+                --output-dir $(dirname {output.features}) \
+                --steps radiomics
             """
 
 
@@ -289,13 +289,9 @@ rule train_baseline:
     shell:
         """
         python scripts/train_baselines.py \
-            --embeddings_dir {EMBEDDINGS_DIR} \
-            --splits_dir {SPLITS_DIR} \
-            --output_dir $(dirname {output.model}) \
-            --model_type {params.model_type} \
-            --num_epochs {params.num_epochs} \
-            --learning_rate {params.learning_rate} \
-            --batch_size {params.batch_size}
+            --config configs/model_baselines.yaml \
+            --model {params.model_type} \
+            --output_dir $(dirname {output.model})
         """
 
 
@@ -330,12 +326,9 @@ rule train_foundation:
     shell:
         """
         python scripts/extract_foundation_features.py \
-            --embeddings_dir {EMBEDDINGS_DIR} \
-            --splits_dir {SPLITS_DIR} \
-            --output_dir $(dirname {output.model}) \
-            --foundation_type {params.foundation_type} \
-            --num_epochs {params.num_epochs} \
-            --learning_rate {params.learning_rate}
+            --input-dir {EMBEDDINGS_DIR} \
+            --output-dir $(dirname {output.model}) \
+            --backbone {params.foundation_type}
         """
 
 

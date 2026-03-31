@@ -1,0 +1,22 @@
+# Auto-generated lockfile — do not edit manually.
+# Regenerate with: pip-compile requirements.txt -o requirements.lock
+
+ImageHash==4.3.2
+Jinja2==3.1.6
+PyYAML==6.0.3
+joblib==1.5.3
+lifelines==0.30.3
+matplotlib==3.10.8
+numpy==2.4.4
+optuna==4.8.0
+pandas==2.3.3
+pillow==12.1.1
+pyarrow==23.0.1
+scikit-learn==1.8.0
+scikit-survival==0.27.0
+scipy==1.17.1
+seaborn==0.13.2
+torch==2.11.0+cpu
+torchvision==0.26.0+cpu
+tqdm==4.67.3
+zarr==3.1.6
