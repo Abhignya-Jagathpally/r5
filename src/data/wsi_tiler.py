@@ -83,7 +83,7 @@ class WSITiler:
                 slide_mag = float(properties["openslide.objective-power"])
                 return slide_mag / self.magnification
             return 1.0
-        except Exception as e:
+        except (KeyError, AttributeError, ValueError) as e:
             logger.warning(f"Could not determine magnification, assuming 1x: {e}")
             return 1.0
 
@@ -146,7 +146,7 @@ class WSITiler:
 
         try:
             slide = openslide.open_slide(slide_path)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to open slide {slide_path}: {e}")
             return []
 
@@ -205,7 +205,7 @@ class WSITiler:
                     )
                     tile_count += 1
 
-                except Exception as e:
+                except (OSError, ValueError, RuntimeError) as e:
                     logger.warning(f"Error processing tile at ({x}, {y}): {e}")
                     skipped_count += 1
 
@@ -244,7 +244,7 @@ class WSITiler:
                 logger.error(f"Failed to read image: {image_path}")
                 return []
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to open image {image_path}: {e}")
             return []
 
@@ -292,7 +292,7 @@ class WSITiler:
                     )
                     tile_count += 1
 
-                except Exception as e:
+                except (OSError, ValueError, RuntimeError) as e:
                     logger.warning(f"Error processing tile at ({x}, {y}): {e}")
                     skipped_count += 1
 
@@ -374,7 +374,7 @@ class WSITiler:
                 try:
                     tiles = future.result()
                     all_tiles.extend(tiles)
-                except Exception as e:
+                except (OSError, ValueError, RuntimeError) as e:
                     logger.error(f"Failed to process slide {slide_id}: {e}")
 
         manifest_df = pd.DataFrame(all_tiles)

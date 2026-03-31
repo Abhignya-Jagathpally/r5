@@ -237,7 +237,7 @@ class AgenticTuner:
                         f"(best: {self.best_metric_value:.4f})"
                     )
 
-            except Exception as e:
+            except (ValueError, RuntimeError, OSError, KeyError) as e:
                 self.logger.error(f"Trial {trial_count} failed: {str(e)}")
                 result = ExperimentResult(
                     trial_id=trial_count,
@@ -437,7 +437,7 @@ class AgenticTuner:
             train_len = len(train_data)
             val_len = len(val_data)
             self.logger.debug(f"Data integrity: train={train_len}, val={val_len}")
-        except Exception as e:
+        except (TypeError, AttributeError, ValueError) as e:
             self.logger.warning(f"Could not verify data consistency: {str(e)}")
 
     def _compute_preprocessing_hash(self) -> str:
@@ -472,7 +472,7 @@ class AgenticTuner:
                 check=True,
             )
             return result.stdout.strip()
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return None
 
     def _generate_experiment_journal(self):

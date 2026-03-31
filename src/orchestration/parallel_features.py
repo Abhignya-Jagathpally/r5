@@ -89,7 +89,7 @@ class RayTileProcessor:
             self.logger.info(
                 f"Ray cluster initialized with {self.config.num_workers} workers"
             )
-        except Exception as e:
+        except (ImportError, RuntimeError, OSError) as e:
             raise RuntimeError(f"Failed to initialize Ray: {str(e)}")
 
     def shutdown(self):
@@ -101,7 +101,7 @@ class RayTileProcessor:
                 ray.shutdown()
                 self._initialized = False
                 self.logger.info("Ray cluster shutdown complete")
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.error(f"Error during Ray shutdown: {str(e)}")
 
     def _count_gpus(self) -> int:
@@ -110,7 +110,7 @@ class RayTileProcessor:
             import torch
 
             return torch.cuda.device_count()
-        except Exception:
+        except (ImportError, RuntimeError):
             return 0
 
     def process_wsis(
@@ -169,14 +169,14 @@ class RayTileProcessor:
                     completed += 1
                     if completed % max(1, len(futures) // 10) == 0:
                         self.logger.info(f"Progress: {completed}/{len(futures)} WSIs")
-                except Exception as e:
+                except (RuntimeError, ValueError, OSError, TimeoutError) as e:
                     self.logger.error(f"Failed to process {wsi_path}: {str(e)}")
                     raise
 
             self.logger.info(f"Successfully processed {completed}/{len(wsi_paths)} WSIs")
             return results
 
-        except Exception as e:
+        except (ImportError, RuntimeError, OSError) as e:
             self.logger.error(f"Error during WSI processing: {str(e)}")
             raise RuntimeError(f"WSI processing failed: {str(e)}")
 
@@ -209,7 +209,7 @@ class RayTileProcessor:
             np.save(str(output_path), embeddings)
             logger.info(f"Saved embeddings to {output_path}")
             return embeddings
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error(f"Failed to process WSI {wsi_idx}: {str(e)}")
             raise
 
@@ -247,7 +247,7 @@ class RayTileProcessor:
             embeddings = ray.get(futures)
             return embeddings
 
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError) as e:
             logger.error(f"Embedding extraction failed: {str(e)}")
             raise RuntimeError(f"Failed to extract embeddings: {str(e)}")
 
@@ -262,7 +262,7 @@ class RayTileProcessor:
         """
         try:
             return embedding_fn(batch)
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             logger.error(f"Batch embedding extraction failed: {str(e)}")
             raise
 
@@ -331,7 +331,7 @@ class DaskRadiomicsExtractor:
             self.logger.info(
                 f"Dask client initialized: {self.client.cluster.scheduler.address}"
             )
-        except Exception as e:
+        except (ImportError, RuntimeError, OSError) as e:
             raise RuntimeError(f"Failed to initialize Dask: {str(e)}")
 
     def shutdown(self):
@@ -340,7 +340,7 @@ class DaskRadiomicsExtractor:
             try:
                 self.client.close()
                 self.logger.info("Dask client shutdown complete")
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.error(f"Error during Dask shutdown: {str(e)}")
 
     def extract_batch(
@@ -423,7 +423,7 @@ class DaskRadiomicsExtractor:
             )
             return all_features
 
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError, TimeoutError) as e:
             self.logger.error(f"Radiomics extraction failed: {str(e)}")
             raise RuntimeError(f"Failed to extract radiomics: {str(e)}")
 
@@ -511,14 +511,14 @@ class DaskRadiomicsExtractor:
                         timeout=self.config.timeout_seconds
                     )
                     results[path] = result
-                except Exception as e:
+                except (RuntimeError, ValueError, OSError, TimeoutError) as e:
                     self.logger.error(f"Failed to extract radiomics for {path}: {str(e)}")
                     raise
 
             self.logger.info(f"Successfully extracted radiomics for {len(results)} files")
             return results
 
-        except Exception as e:
+        except (ImportError, RuntimeError, OSError, TimeoutError) as e:
             self.logger.error(f"Parallel radiomics extraction failed: {str(e)}")
             raise RuntimeError(f"Radiomics extraction failed: {str(e)}")
 
@@ -542,7 +542,7 @@ class DaskRadiomicsExtractor:
             for path, future in future_map.items():
                 try:
                     results[path] = future.result(timeout=self.config.timeout_seconds)
-                except Exception as e:
+                except (RuntimeError, ValueError, OSError, TimeoutError) as e:
                     self.logger.error(f"Failed to extract radiomics for {path}: {str(e)}")
                     raise
 

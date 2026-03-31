@@ -61,7 +61,7 @@ class TileDeduplicator:
                 return imagehash.whash(image)
             else:
                 raise ValueError(f"Unknown hash algorithm: {self.hash_algorithm}")
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Error computing hash for {image_path}: {e}")
             return None
 

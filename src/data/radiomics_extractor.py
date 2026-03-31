@@ -109,7 +109,7 @@ class RadiomicsExtractor:
                 elif feature_class_lower == "gldm":
                     self.extractor.enableFeatureClassByName("gldm")
 
-        except Exception as e:
+        except (ValueError, RuntimeError, KeyError) as e:
             logger.error(f"Failed to initialize feature extractor: {e}")
             raise
 
@@ -152,7 +152,7 @@ class RadiomicsExtractor:
 
             return features_dict
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error(f"Error extracting features from {image_path}: {e}")
             return {}
 

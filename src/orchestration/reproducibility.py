@@ -82,7 +82,7 @@ class EnvironmentSnapshot:
                     name, version = line.split("==")
                     packages[name] = version
             return packages
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
             logger.error(f"Failed to get installed packages: {str(e)}")
             return {}
 
@@ -105,7 +105,7 @@ class EnvironmentSnapshot:
                 if torch.cuda.is_available()
                 else [],
             }
-        except Exception as e:
+        except (ImportError, RuntimeError) as e:
             logger.warning(f"Could not get GPU info: {str(e)}")
             return {"available": False}
 
@@ -116,7 +116,7 @@ class EnvironmentSnapshot:
             import torch
 
             return torch.version.cuda
-        except Exception:
+        except (ImportError, AttributeError):
             return None
 
     @staticmethod
@@ -131,7 +131,7 @@ class EnvironmentSnapshot:
                 cwd=Path.cwd(),
             )
             return result.stdout.strip()
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return None
 
     @staticmethod
@@ -146,7 +146,7 @@ class EnvironmentSnapshot:
                 cwd=Path.cwd(),
             )
             return result.stdout.strip()
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return None
 
 

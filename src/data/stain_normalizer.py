@@ -471,7 +471,7 @@ class StainNormalizer:
                 output_file = output_path / tile_file.name
                 Image.fromarray(normalized).save(output_file)
 
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 logger.error(f"Error processing {tile_file}: {e}")
                 stats["errors"] += 1
 

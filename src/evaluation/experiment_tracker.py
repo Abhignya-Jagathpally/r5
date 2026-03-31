@@ -172,7 +172,7 @@ class ExperimentTracker(ABC):
             )
 
             logger.info("Logged environment information")
-        except Exception as e:
+        except (OSError, ImportError, subprocess.SubprocessError) as e:
             logger.warning(f"Failed to log environment: {e}")
 
 
@@ -298,7 +298,7 @@ class MLflowBackend(ExperimentTracker):
         try:
             self.mlflow.log_model(model, artifact_path, **kwargs)
             logger.info(f"Logged model to {artifact_path}")
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error(f"Failed to log model: {e}")
 
     def register_model(
@@ -316,7 +316,7 @@ class MLflowBackend(ExperimentTracker):
         try:
             self.mlflow.register_model(model_uri, name)
             logger.info(f"Registered model: {name}")
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error(f"Failed to register model: {e}")
 
 
@@ -556,7 +556,7 @@ class DVCIntegration:
                     stage_def += f"      - {param}\n"
 
             logger.info(f"Added pipeline stage: {name}")
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to add pipeline stage: {e}")
 
     def push(self, remote: Optional[str] = None) -> None:
@@ -601,6 +601,6 @@ class DVCIntegration:
             import json
             with open(metrics_path) as f:
                 return json.load(f)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to load metrics: {e}")
             return {}

@@ -283,7 +283,7 @@ class HyperparameterSearcher:
                 "analysis": analysis,
             }
 
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError) as e:
             self.logger.error(f"Hyperparameter search failed: {str(e)}")
             raise RuntimeError(f"Search failed: {str(e)}")
 
@@ -316,7 +316,7 @@ class HyperparameterSearcher:
             try:
                 from ray.tune.suggest.optuna import OptunaSearch
                 return OptunaSearch(space=search_space)
-            except Exception as e:
+            except (ImportError, ValueError, RuntimeError) as e:
                 self.logger.warning(
                     f"Optuna search unavailable ({str(e)}), falling back to random"
                 )
@@ -326,7 +326,7 @@ class HyperparameterSearcher:
             try:
                 from ray.tune.suggest.skopt import SkoptSearch
                 return SkoptSearch(space=search_space, metric=self.config.metric, mode=self.config.metric_mode)
-            except Exception as e:
+            except (ImportError, ValueError, RuntimeError) as e:
                 self.logger.warning(
                     f"Bayesian search unavailable ({str(e)}), falling back to random"
                 )
@@ -438,7 +438,7 @@ class HyperparameterSearcher:
                 "best_fold": best_fold_idx + 1,
             }
 
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError) as e:
             self.logger.error(f"CV search failed: {str(e)}")
             raise RuntimeError(f"CV search failed: {str(e)}")
 
