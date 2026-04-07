@@ -1,0 +1,18 @@
+{
+  "n_patients": 60,
+  "n_slides": 60,
+  "n_tiles_total": 6000,
+  "embedding_dim": 2048,
+  "positive_rate": 0.35,
+  "event_rate": 0.5166666666666667,
+  "paths": {
+    "patient_metadata": "data/patient_metadata.csv",
+    "slide_metadata": "data/slide_metadata.csv",
+    "tile_manifest": "data/tiles/tile_manifest.csv",
+    "embeddings": "data/embeddings/embeddings.npz",
+    "radiomics_features": "data/features/radiomics_features.csv",
+    "splits": "data/splits/splits.csv",
+    "data_dir": "data"
+  },
+  "seed": 42
+}

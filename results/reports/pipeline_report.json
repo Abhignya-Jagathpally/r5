@@ -1,0 +1,127 @@
+{
+  "pipeline": "R5 \u2014 MM Imaging Pathology & Radiomics",
+  "version": "0.1.0",
+  "run_id": "20260330_012550",
+  "timestamp": "2026-03-30T01:26:46.250286",
+  "stages_completed": [
+    "preprocessing",
+    "baselines",
+    "foundation",
+    "fusion",
+    "evaluation"
+  ],
+  "timings": {
+    "preprocessing": 2.66,
+    "baselines": 27.98,
+    "foundation": 24.17,
+    "fusion": 0.87,
+    "evaluation": 0.0
+  },
+  "total_time_seconds": 55.68,
+  "device": "cpu",
+  "seed": 42,
+  "preprocessing": {
+    "data_generation": {
+      "patient_metadata": "data/patient_metadata.csv",
+      "slide_metadata": "data/slide_metadata.csv",
+      "tile_manifest": "data/tiles/tile_manifest.csv",
+      "embeddings": "data/embeddings/embeddings.npz",
+      "radiomics_features": "data/features/radiomics_features.csv",
+      "splits": "data/splits/splits.csv",
+      "data_dir": "data"
+    },
+    "n_patients": 60,
+    "n_slides": 60,
+    "n_tiles": 6000,
+    "positive_rate": 0.35,
+    "n_train": "42",
+    "n_val": "9",
+    "n_test": "9"
+  },
+  "baselines": {
+    "logistic_regression": {
+      "auroc": 0.9,
+      "accuracy": 0.5556
+    },
+    "random_forest": {
+      "auroc": 1.0,
+      "accuracy": 0.8889
+    },
+    "abmil": {
+      "auroc": 0.75,
+      "accuracy": 0.5556,
+      "best_val_auroc": 0.5
+    }
+  },
+  "foundation": {
+    "transmil": {
+      "auroc": 0.8
+    }
+  },
+  "fusion": {
+    "gated_fusion": {
+      "auroc": 0.75,
+      "accuracy": 0.6667,
+      "modality_weights": {
+        "imaging": 0.508,
+        "radiomics": 0.492
+      }
+    }
+  },
+  "evaluation": {
+    "model_metrics": {
+      "logistic_regression": {
+        "auroc": 0.9,
+        "accuracy": 0.5556
+      },
+      "random_forest": {
+        "auroc": 1.0,
+        "accuracy": 0.8889
+      },
+      "abmil": {
+        "auroc": 0.75,
+        "accuracy": 0.5556,
+        "best_val_auroc": 0.5
+      },
+      "transmil": {
+        "auroc": 0.8
+      },
+      "gated_fusion": {
+        "auroc": 0.75,
+        "accuracy": 0.6667,
+        "modality_weights": {
+          "imaging": 0.508,
+          "radiomics": 0.492
+        }
+      }
+    },
+    "benchmarks": {
+      "t11_14_detection": {
+        "auroc": 0.85,
+        "sensitivity": 0.88,
+        "specificity": 0.831,
+        "source": "H&E-based t(11;14) detection study",
+        "year": 2021
+      },
+      "multimodal_t11_14": {
+        "auroc": 0.892,
+        "accuracy": 0.87,
+        "f1_macro": 0.88,
+        "source": "2024 multimodal morphology+flow cytometry study",
+        "year": 2024
+      },
+      "pet_ct_radiomics": {
+        "c_index": 0.693,
+        "auroc": 0.71,
+        "source": "PET/CT radiomics NDMM prognostic study",
+        "year": 2023
+      },
+      "multiomics_signature": {
+        "auroc": 0.76,
+        "c_index": 0.72,
+        "source": "Genomic + imaging integration study",
+        "year": 2023
+      }
+    }
+  }
+}

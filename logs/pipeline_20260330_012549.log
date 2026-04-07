@@ -1,0 +1,231 @@
+2026-03-30 01:25:49,606 [INFO] mm_pipeline: Logging to logs/pipeline_20260330_012549.log
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: ======================================================================
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: R5 — MM Imaging Pathology & Radiomics Pipeline v0.1.0
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: Run ID:  20260330_012550
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: Config:  configs/pipeline.json
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: Stages:  ['preprocessing', 'baselines', 'foundation', 'fusion', 'evaluation', 'report']
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: Output:  ./results
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: Device:  cpu
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: Seed:    42
+2026-03-30 01:25:50,557 [INFO] mm_pipeline: ======================================================================
+2026-03-30 01:25:50,557 [INFO] src.utils.config: Loaded config from configs/data_pipeline.json (9 top-level keys)
+2026-03-30 01:25:50,558 [INFO] src.utils.config: Loaded config from configs/model_baselines.json (9 top-level keys)
+2026-03-30 01:25:50,558 [INFO] src.utils.config: Loaded config from configs/foundation_models.json (9 top-level keys)
+2026-03-30 01:25:50,558 [INFO] src.utils.config: Loaded config from configs/foundation_models.json (9 top-level keys)
+2026-03-30 01:25:50,558 [INFO] src.utils.config: Loaded config from configs/evaluation.json (11 top-level keys)
+2026-03-30 01:25:50,558 [INFO] src.utils.config: Loaded config from configs/evaluation.json (11 top-level keys)
+2026-03-30 01:25:50,558 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:25:50,558 [INFO] mm_pipeline: STAGE: PREPROCESSING
+2026-03-30 01:25:50,559 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:25:50,662 [INFO] numexpr.utils: Note: detected 128 virtual cores but NumExpr set to maximum of 64, check "NUMEXPR_MAX_THREADS" environment variable.
+2026-03-30 01:25:50,662 [INFO] numexpr.utils: Note: NumExpr detected 128 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 16.
+2026-03-30 01:25:50,662 [INFO] numexpr.utils: NumExpr defaulting to 16 threads.
+2026-03-30 01:25:50,809 [INFO] mm_pipeline: Generating synthetic demo data...
+2026-03-30 01:25:50,810 [INFO] scripts.generate_demo_data: Generating demo data: 60 patients, 60 slides, 6000 tiles
+2026-03-30 01:25:50,812 [INFO] scripts.generate_demo_data: Patient metadata: data/patient_metadata.csv (60 patients)
+2026-03-30 01:25:50,824 [INFO] scripts.generate_demo_data: Slide metadata: data/slide_metadata.csv (60 slides)
+2026-03-30 01:25:50,955 [INFO] scripts.generate_demo_data: Tile manifest: data/tiles/tile_manifest.csv (6000 tiles)
+2026-03-30 01:25:50,978 [INFO] scripts.generate_demo_data: Sample tile images saved to data/tiles/images
+2026-03-30 01:25:53,196 [INFO] scripts.generate_demo_data: Embeddings: data/embeddings/embeddings.npz (2048-dim)
+2026-03-30 01:25:53,204 [INFO] scripts.generate_demo_data: Radiomics features: data/features/radiomics_features.csv (93 features)
+2026-03-30 01:25:53,207 [INFO] scripts.generate_demo_data: Splits: data/splits/splits.csv (train=42, val=9, test=9)
+2026-03-30 01:25:53,207 [INFO] scripts.generate_demo_data: Demo data summary: data/demo_data_summary.json
+2026-03-30 01:25:53,223 [INFO] mm_pipeline:   train: 42 slides
+2026-03-30 01:25:53,223 [INFO] mm_pipeline:   val: 9 slides
+2026-03-30 01:25:53,223 [INFO] mm_pipeline:   test: 9 slides
+2026-03-30 01:25:53,223 [INFO] mm_pipeline: Preprocessing complete: 60 patients, 60 slides, 6000 tiles
+2026-03-30 01:25:53,223 [INFO] mm_pipeline: Stage preprocessing completed in 2.7s
+2026-03-30 01:25:53,223 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:25:53,224 [INFO] mm_pipeline: STAGE: BASELINES
+2026-03-30 01:25:53,224 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:25:54,399 [INFO] mm_pipeline: Data: train=42, val=9, test=9
+2026-03-30 01:25:54,399 [INFO] mm_pipeline: Training mean-pool + LogisticRegression baseline...
+2026-03-30 01:25:54,406 [INFO] mm_pipeline:   LogisticRegression: AUROC=0.9000, Acc=0.5556
+2026-03-30 01:25:54,406 [INFO] mm_pipeline: Training mean-pool + RandomForest baseline...
+2026-03-30 01:25:54,515 [INFO] mm_pipeline:   RandomForest: AUROC=1.0000, Acc=0.8889
+2026-03-30 01:25:54,515 [INFO] mm_pipeline: Training ABMIL...
+2026-03-30 01:25:56,137 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0000.pt (epoch 0, val_auroc=0.2857142857142857)
+2026-03-30 01:25:56,138 [INFO] src.utils.checkpoint_manager: New best: val_auroc=0.2857
+2026-03-30 01:25:56,138 [INFO] mm_pipeline:   Epoch 1/30: loss=29.3628, val_auroc=0.2857
+2026-03-30 01:25:57,011 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0001.pt (epoch 1, val_auroc=0.5)
+2026-03-30 01:25:57,011 [INFO] src.utils.checkpoint_manager: New best: val_auroc=0.5000
+2026-03-30 01:25:57,876 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0002.pt (epoch 2, val_auroc=0.5)
+2026-03-30 01:25:58,749 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0003.pt (epoch 3, val_auroc=0.5)
+2026-03-30 01:25:59,613 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0004.pt (epoch 4, val_auroc=0.5)
+2026-03-30 01:26:00,464 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0005.pt (epoch 5, val_auroc=0.5)
+2026-03-30 01:26:01,332 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0006.pt (epoch 6, val_auroc=0.5)
+2026-03-30 01:26:02,195 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0007.pt (epoch 7, val_auroc=0.5)
+2026-03-30 01:26:03,063 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0008.pt (epoch 8, val_auroc=0.5)
+2026-03-30 01:26:03,923 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0009.pt (epoch 9, val_auroc=0.5)
+2026-03-30 01:26:03,926 [INFO] mm_pipeline:   Epoch 10/30: loss=0.0129, val_auroc=0.5000
+2026-03-30 01:26:04,775 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0010.pt (epoch 10, val_auroc=0.5)
+2026-03-30 01:26:05,638 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0011.pt (epoch 11, val_auroc=0.5)
+2026-03-30 01:26:06,496 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0012.pt (epoch 12, val_auroc=0.5)
+2026-03-30 01:26:07,352 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0013.pt (epoch 13, val_auroc=0.5)
+2026-03-30 01:26:08,210 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0014.pt (epoch 14, val_auroc=0.5)
+2026-03-30 01:26:09,073 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0015.pt (epoch 15, val_auroc=0.5)
+2026-03-30 01:26:09,956 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0016.pt (epoch 16, val_auroc=0.5)
+2026-03-30 01:26:10,805 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0017.pt (epoch 17, val_auroc=0.5)
+2026-03-30 01:26:11,668 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0018.pt (epoch 18, val_auroc=0.5)
+2026-03-30 01:26:12,529 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0019.pt (epoch 19, val_auroc=0.5)
+2026-03-30 01:26:12,531 [INFO] mm_pipeline:   Epoch 20/30: loss=0.0046, val_auroc=0.5000
+2026-03-30 01:26:13,379 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0020.pt (epoch 20, val_auroc=0.5)
+2026-03-30 01:26:14,254 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0021.pt (epoch 21, val_auroc=0.5)
+2026-03-30 01:26:15,129 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0022.pt (epoch 22, val_auroc=0.5)
+2026-03-30 01:26:15,981 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0023.pt (epoch 23, val_auroc=0.5)
+2026-03-30 01:26:16,834 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0024.pt (epoch 24, val_auroc=0.5)
+2026-03-30 01:26:17,694 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0025.pt (epoch 25, val_auroc=0.5)
+2026-03-30 01:26:18,562 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0026.pt (epoch 26, val_auroc=0.5)
+2026-03-30 01:26:19,417 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0027.pt (epoch 27, val_auroc=0.5)
+2026-03-30 01:26:20,275 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0028.pt (epoch 28, val_auroc=0.5)
+2026-03-30 01:26:21,118 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/baselines/checkpoints/abmil/abmil_20260330_012550_epoch0029.pt (epoch 29, val_auroc=0.5)
+2026-03-30 01:26:21,120 [INFO] mm_pipeline:   Epoch 30/30: loss=0.0031, val_auroc=0.5000
+2026-03-30 01:26:21,207 [INFO] mm_pipeline:   ABMIL test: AUROC=0.7500, Acc=0.5556
+2026-03-30 01:26:21,207 [INFO] mm_pipeline: Stage baselines completed in 28.0s
+2026-03-30 01:26:21,208 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:21,208 [INFO] mm_pipeline: STAGE: FOUNDATION
+2026-03-30 01:26:21,208 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:21,217 [INFO] mm_pipeline: Training TransMIL head (dim=2048)...
+2026-03-30 01:26:22,017 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0000.pt (epoch 0, val_auroc=0.7142857142857143)
+2026-03-30 01:26:22,017 [INFO] src.utils.checkpoint_manager: New best: val_auroc=0.7143
+2026-03-30 01:26:22,017 [INFO] mm_pipeline:   Epoch 1/30: loss=0.6599, val_auroc=0.7143
+2026-03-30 01:26:22,824 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0001.pt (epoch 1, val_auroc=0.6428571428571428)
+2026-03-30 01:26:23,624 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0002.pt (epoch 2, val_auroc=0.6428571428571428)
+2026-03-30 01:26:24,429 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0003.pt (epoch 3, val_auroc=0.6428571428571428)
+2026-03-30 01:26:25,243 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0004.pt (epoch 4, val_auroc=0.6428571428571428)
+2026-03-30 01:26:26,052 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0005.pt (epoch 5, val_auroc=0.6428571428571428)
+2026-03-30 01:26:26,849 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0006.pt (epoch 6, val_auroc=0.6428571428571428)
+2026-03-30 01:26:27,640 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0007.pt (epoch 7, val_auroc=0.6428571428571428)
+2026-03-30 01:26:28,442 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0008.pt (epoch 8, val_auroc=0.6428571428571428)
+2026-03-30 01:26:29,233 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0009.pt (epoch 9, val_auroc=0.6428571428571428)
+2026-03-30 01:26:29,235 [INFO] mm_pipeline:   Epoch 10/30: loss=0.0007, val_auroc=0.6429
+2026-03-30 01:26:30,043 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0010.pt (epoch 10, val_auroc=0.6428571428571428)
+2026-03-30 01:26:30,846 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0011.pt (epoch 11, val_auroc=0.6428571428571428)
+2026-03-30 01:26:31,639 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0012.pt (epoch 12, val_auroc=0.6428571428571428)
+2026-03-30 01:26:32,449 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0013.pt (epoch 13, val_auroc=0.6428571428571428)
+2026-03-30 01:26:33,251 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0014.pt (epoch 14, val_auroc=0.6428571428571428)
+2026-03-30 01:26:34,044 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0015.pt (epoch 15, val_auroc=0.6428571428571428)
+2026-03-30 01:26:34,845 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0016.pt (epoch 16, val_auroc=0.6428571428571428)
+2026-03-30 01:26:35,647 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0017.pt (epoch 17, val_auroc=0.6428571428571428)
+2026-03-30 01:26:36,453 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0018.pt (epoch 18, val_auroc=0.6428571428571428)
+2026-03-30 01:26:37,261 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0019.pt (epoch 19, val_auroc=0.6428571428571428)
+2026-03-30 01:26:37,263 [INFO] mm_pipeline:   Epoch 20/30: loss=0.0003, val_auroc=0.6429
+2026-03-30 01:26:38,066 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0020.pt (epoch 20, val_auroc=0.6428571428571428)
+2026-03-30 01:26:38,869 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0021.pt (epoch 21, val_auroc=0.6428571428571428)
+2026-03-30 01:26:39,675 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0022.pt (epoch 22, val_auroc=0.6428571428571428)
+2026-03-30 01:26:40,473 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0023.pt (epoch 23, val_auroc=0.6428571428571428)
+2026-03-30 01:26:41,270 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0024.pt (epoch 24, val_auroc=0.6428571428571428)
+2026-03-30 01:26:42,066 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0025.pt (epoch 25, val_auroc=0.6428571428571428)
+2026-03-30 01:26:42,869 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0026.pt (epoch 26, val_auroc=0.6428571428571428)
+2026-03-30 01:26:43,675 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0027.pt (epoch 27, val_auroc=0.6428571428571428)
+2026-03-30 01:26:44,478 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0028.pt (epoch 28, val_auroc=0.6428571428571428)
+2026-03-30 01:26:45,285 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/foundation/checkpoints/transmil_20260330_012550_epoch0029.pt (epoch 29, val_auroc=0.6428571428571428)
+2026-03-30 01:26:45,288 [INFO] mm_pipeline:   Epoch 30/30: loss=0.0003, val_auroc=0.6429
+2026-03-30 01:26:45,373 [INFO] mm_pipeline:   TransMIL test AUROC: 0.8000
+2026-03-30 01:26:45,374 [INFO] mm_pipeline: Stage foundation completed in 24.2s
+2026-03-30 01:26:45,374 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:45,374 [INFO] mm_pipeline: STAGE: FUSION
+2026-03-30 01:26:45,374 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:45,384 [INFO] mm_pipeline: Training gated fusion (img=2048, rad=93)...
+2026-03-30 01:26:45,754 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0000.pt (epoch 0, val_auroc=0.7857142857142857)
+2026-03-30 01:26:45,754 [INFO] src.utils.checkpoint_manager: New best: val_auroc=0.7857
+2026-03-30 01:26:45,755 [INFO] mm_pipeline:   Epoch 1/50: loss=0.6997, val_auroc=0.7857
+2026-03-30 01:26:45,765 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0001.pt (epoch 1, val_auroc=0.6428571428571428)
+2026-03-30 01:26:45,774 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0002.pt (epoch 2, val_auroc=0.6428571428571428)
+2026-03-30 01:26:45,784 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0003.pt (epoch 3, val_auroc=0.6428571428571428)
+2026-03-30 01:26:45,794 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0004.pt (epoch 4, val_auroc=0.5714285714285714)
+2026-03-30 01:26:45,804 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0005.pt (epoch 5, val_auroc=0.5714285714285714)
+2026-03-30 01:26:45,813 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0006.pt (epoch 6, val_auroc=0.5)
+2026-03-30 01:26:45,824 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0007.pt (epoch 7, val_auroc=0.5)
+2026-03-30 01:26:45,834 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0008.pt (epoch 8, val_auroc=0.5)
+2026-03-30 01:26:45,844 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0009.pt (epoch 9, val_auroc=0.5)
+2026-03-30 01:26:45,845 [INFO] mm_pipeline:   Epoch 10/50: loss=0.4397, val_auroc=0.5000
+2026-03-30 01:26:45,855 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0010.pt (epoch 10, val_auroc=0.5)
+2026-03-30 01:26:45,865 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0011.pt (epoch 11, val_auroc=0.5)
+2026-03-30 01:26:45,875 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0012.pt (epoch 12, val_auroc=0.5)
+2026-03-30 01:26:45,885 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0013.pt (epoch 13, val_auroc=0.5)
+2026-03-30 01:26:45,896 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0014.pt (epoch 14, val_auroc=0.5)
+2026-03-30 01:26:45,906 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0015.pt (epoch 15, val_auroc=0.5)
+2026-03-30 01:26:45,916 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0016.pt (epoch 16, val_auroc=0.5)
+2026-03-30 01:26:45,926 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0017.pt (epoch 17, val_auroc=0.5)
+2026-03-30 01:26:45,936 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0018.pt (epoch 18, val_auroc=0.5)
+2026-03-30 01:26:45,947 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0019.pt (epoch 19, val_auroc=0.5)
+2026-03-30 01:26:45,947 [INFO] mm_pipeline:   Epoch 20/50: loss=0.2041, val_auroc=0.5000
+2026-03-30 01:26:45,957 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0020.pt (epoch 20, val_auroc=0.5)
+2026-03-30 01:26:45,967 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0021.pt (epoch 21, val_auroc=0.5)
+2026-03-30 01:26:45,977 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0022.pt (epoch 22, val_auroc=0.5)
+2026-03-30 01:26:45,987 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0023.pt (epoch 23, val_auroc=0.5)
+2026-03-30 01:26:45,997 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0024.pt (epoch 24, val_auroc=0.5)
+2026-03-30 01:26:46,007 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0025.pt (epoch 25, val_auroc=0.5)
+2026-03-30 01:26:46,017 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0026.pt (epoch 26, val_auroc=0.5)
+2026-03-30 01:26:46,027 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0027.pt (epoch 27, val_auroc=0.5)
+2026-03-30 01:26:46,036 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0028.pt (epoch 28, val_auroc=0.5)
+2026-03-30 01:26:46,046 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0029.pt (epoch 29, val_auroc=0.5)
+2026-03-30 01:26:46,047 [INFO] mm_pipeline:   Epoch 30/50: loss=0.0383, val_auroc=0.5000
+2026-03-30 01:26:46,056 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0030.pt (epoch 30, val_auroc=0.5)
+2026-03-30 01:26:46,066 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0031.pt (epoch 31, val_auroc=0.5)
+2026-03-30 01:26:46,076 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0032.pt (epoch 32, val_auroc=0.5)
+2026-03-30 01:26:46,086 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0033.pt (epoch 33, val_auroc=0.5)
+2026-03-30 01:26:46,096 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0034.pt (epoch 34, val_auroc=0.5)
+2026-03-30 01:26:46,106 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0035.pt (epoch 35, val_auroc=0.5)
+2026-03-30 01:26:46,116 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0036.pt (epoch 36, val_auroc=0.5)
+2026-03-30 01:26:46,126 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0037.pt (epoch 37, val_auroc=0.5)
+2026-03-30 01:26:46,135 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0038.pt (epoch 38, val_auroc=0.5)
+2026-03-30 01:26:46,145 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0039.pt (epoch 39, val_auroc=0.5)
+2026-03-30 01:26:46,146 [INFO] mm_pipeline:   Epoch 40/50: loss=0.0045, val_auroc=0.5000
+2026-03-30 01:26:46,155 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0040.pt (epoch 40, val_auroc=0.5)
+2026-03-30 01:26:46,165 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0041.pt (epoch 41, val_auroc=0.5)
+2026-03-30 01:26:46,175 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0042.pt (epoch 42, val_auroc=0.5)
+2026-03-30 01:26:46,185 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0043.pt (epoch 43, val_auroc=0.5)
+2026-03-30 01:26:46,195 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0044.pt (epoch 44, val_auroc=0.5)
+2026-03-30 01:26:46,205 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0045.pt (epoch 45, val_auroc=0.5)
+2026-03-30 01:26:46,215 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0046.pt (epoch 46, val_auroc=0.5)
+2026-03-30 01:26:46,225 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0047.pt (epoch 47, val_auroc=0.5)
+2026-03-30 01:26:46,235 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0048.pt (epoch 48, val_auroc=0.5)
+2026-03-30 01:26:46,245 [INFO] src.utils.checkpoint_manager: Checkpoint saved: results/fusion/checkpoints/gated_fusion_20260330_012550_epoch0049.pt (epoch 49, val_auroc=0.5)
+2026-03-30 01:26:46,246 [INFO] mm_pipeline:   Epoch 50/50: loss=0.0007, val_auroc=0.5000
+2026-03-30 01:26:46,248 [INFO] mm_pipeline:   Gated fusion test: AUROC=0.7500, Acc=0.6667
+2026-03-30 01:26:46,248 [INFO] mm_pipeline:   Modality weights: imaging=0.508, radiomics=0.492
+2026-03-30 01:26:46,248 [INFO] mm_pipeline: Stage fusion completed in 0.9s
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: STAGE: EVALUATION
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: 
+============================================================
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: MODEL COMPARISON
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: ============================================================
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: Model                        AUROC   Accuracy
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: ---------------------------------------------
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: logistic_regression         0.9000     0.5556
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: random_forest               1.0000     0.8889
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: abmil                       0.7500     0.5556
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: transmil                    0.8000        N/A
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: gated_fusion                0.7500     0.6667
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: 
+============================================================
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: BENCHMARK COMPARISON
+2026-03-30 01:26:46,249 [INFO] mm_pipeline: ============================================================
+2026-03-30 01:26:46,249 [INFO] mm_pipeline:   t11_14_detection: AUROC=0.85 (source: H&E-based t(11;14) detection study)
+2026-03-30 01:26:46,249 [INFO] mm_pipeline:   multimodal_t11_14: AUROC=0.892 (source: 2024 multimodal morphology+flow cytometry study)
+2026-03-30 01:26:46,249 [INFO] mm_pipeline:   pet_ct_radiomics: AUROC=0.71 (source: PET/CT radiomics NDMM prognostic study)
+2026-03-30 01:26:46,249 [INFO] mm_pipeline:   multiomics_signature: AUROC=0.76 (source: Genomic + imaging integration study)
+2026-03-30 01:26:46,250 [INFO] mm_pipeline: 
+Metrics saved to results/evaluation/all_metrics.json
+2026-03-30 01:26:46,250 [INFO] mm_pipeline: Stage evaluation completed in 0.0s
+2026-03-30 01:26:46,250 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:46,250 [INFO] mm_pipeline: STAGE: REPORT
+2026-03-30 01:26:46,250 [INFO] mm_pipeline: ------------------------------------------------------------
+2026-03-30 01:26:46,250 [INFO] mm_pipeline: Pipeline report: results/reports/pipeline_report.json
+2026-03-30 01:26:46,251 [INFO] mm_pipeline: Total checkpoints saved: 14
+2026-03-30 01:26:46,251 [INFO] mm_pipeline: Stage report completed in 0.0s
+2026-03-30 01:26:46,251 [INFO] mm_pipeline: ======================================================================
+2026-03-30 01:26:46,251 [INFO] mm_pipeline: PIPELINE SUMMARY
+2026-03-30 01:26:46,251 [INFO] mm_pipeline: ======================================================================
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   preprocessing             2.7s  [OK]
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   baselines                28.0s  [OK]
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   foundation               24.2s  [OK]
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   fusion                    0.9s  [OK]
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   evaluation                0.0s  [OK]
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   report                    0.0s  [OK]
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   TOTAL                    55.7s
+2026-03-30 01:26:46,251 [INFO] mm_pipeline:   Status: SUCCESS

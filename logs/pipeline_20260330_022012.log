@@ -1,0 +1,16 @@
+2026-03-30 02:20:12,076 [INFO] mm_pipeline: Logging to logs/pipeline_20260330_022012.log
+2026-03-30 02:20:13,000 [INFO] mm_pipeline: ======================================================================
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: R5 — MM Imaging Pathology & Radiomics Pipeline v0.1.0
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: Run ID:  20260330_022013
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: Config:  configs/pipeline.json
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: Stages:  ['preprocessing', 'baselines', 'foundation', 'fusion', 'evaluation', 'report']
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: Output:  /tmp/mm_pipeline_test_obwdy_kr
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: Device:  cpu
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: Seed:    42
+2026-03-30 02:20:13,001 [INFO] mm_pipeline: ======================================================================
+2026-03-30 02:20:13,001 [INFO] mm_pipeline:   [DRY RUN] → preprocessing
+2026-03-30 02:20:13,001 [INFO] mm_pipeline:   [DRY RUN] → baselines
+2026-03-30 02:20:13,001 [INFO] mm_pipeline:   [DRY RUN] → foundation
+2026-03-30 02:20:13,001 [INFO] mm_pipeline:   [DRY RUN] → fusion
+2026-03-30 02:20:13,001 [INFO] mm_pipeline:   [DRY RUN] → evaluation
+2026-03-30 02:20:13,001 [INFO] mm_pipeline:   [DRY RUN] → report
