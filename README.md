@@ -87,6 +87,9 @@ r5/
 # Install dependencies
 pip install -r requirements.txt
 
+# Download real public datasets (data/ is gitignored, not shipped in repo)
+bash scripts/download_data.sh
+
 # Run the full pipeline via Snakemake
 snakemake --cores 8 --configfile configs/pipeline.yaml
 
